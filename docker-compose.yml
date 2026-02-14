@@ -25,11 +25,11 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./data:/data
+      - ./backend/data:/data
     depends_on:
       db:
         condition: service_healthy
-    command: ["uv", "run", "serve"]
+    command: ["serve"]
 
   frontend:
     build: ./frontend

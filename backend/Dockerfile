@@ -33,4 +33,4 @@ COPY --from=builder /backend/app app/
 ENV PATH="/backend/.venv/bin:$PATH"
 ENV VIRTUAL_ENV="/backend/.venv"
 
-ENTRYPOINT ["uv", "run"]
+CMD ["serve"]
