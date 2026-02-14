@@ -44,3 +44,5 @@ htmlcov/
 # Node / Frontend
 node_modules/
 .next/
+frontend/.svelte-kit/
+frontend/build/
