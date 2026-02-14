@@ -55,19 +55,44 @@
 
 ## Verification Checklist
 
-- [ ] `make db` → PostgreSQL running
-- [ ] `make init` → tables created
-- [ ] `cd backend && uv run ingest download` → 3 files in `data/`
-- [ ] `cd backend && uv run ingest load-postcodes` → ~2.6M rows
-- [ ] `cd backend && uv run ingest load-osm` → ~2-3M rows
-- [ ] `cd backend && uv run ingest merge` → addresses linked + scored
-- [ ] `make status` → shows counts, link rate, avg confidence
-- [ ] `make ingest` → full pipeline end-to-end
-- [ ] Spot check: `SELECT * FROM addresses WHERE postcode_norm = 'SW1A 1AA'`
+- [x] `make db` → PostgreSQL running
+- [x] `make init` → tables created
+- [x] `cd backend && uv run ingest download` → 3 files in `data/`
+- [x] `cd backend && uv run ingest load-postcodes` → ~2.6M rows
+- [x] `cd backend && uv run ingest load-osm` → ~2-3M rows
+- [x] `cd backend && uv run ingest merge` → addresses linked + scored
+- [x] `make status` → shows counts, link rate, avg confidence
+- [x] `make ingest` → full pipeline end-to-end
+- [x] Spot check: `SELECT * FROM addresses WHERE postcode_norm = 'SW1A 1AA'`
 - [x] `make test` → unit tests pass (42/42)
-- [ ] `make test-integration` → integration tests pass (requires Docker)
+- [x] `make test-integration` → integration tests pass (requires Docker)
+
+## Phase 9: FastAPI API Layer — COMPLETE
+
+- [x] `app/api/schemas.py` — Pydantic v2 response models with field-level descriptions and examples
+- [x] `app/api/deps.py` — DI providers: `get_settings()` (lru_cached), `get_db()` (session-per-request)
+- [x] `app/api/errors.py` — Exception handlers: `DatabaseError` → 503, `PostcodeLookupError` → 500
+- [x] `app/api/routers/health.py` — `GET /health` (DB connectivity + record counts)
+- [x] `app/api/routers/postcodes.py` — `GET /postcodes/autocomplete?q=` + `GET /postcodes/{postcode}`
+- [x] `app/api/routers/addresses.py` — `GET /addresses/search?q=&city=&street=&postcode=` + `GET /addresses/{id}`
+- [x] `app/api/main.py` — App factory with CORS, error handlers, OpenAPI tags, Swagger docs
+- [x] `app/api/run.py` — Uvicorn entry point for `uv run serve`
+- [x] `core/config.py` updated with `api_host`, `api_port` settings
+- [x] `pyproject.toml` updated with `serve` script entry
+- [x] `Makefile` updated with `make serve` target
+- [x] `docker-compose.yml` updated with port 8000 mapping + serve command
+- [x] All 51 existing tests still passing, ruff clean
+
+### API Endpoints
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/health` | DB check + record counts |
+| GET | `/postcodes/autocomplete?q=SW1A&limit=10` | Prefix search for type-ahead UI |
+| GET | `/postcodes/{postcode}` | **Primary**: postcode info + all addresses |
+| GET | `/addresses/search?q=&postcode=&street=&city=&page=&page_size=` | Filtered address search with pagination |
+| GET | `/addresses/{id}` | Single address by ID |
 
 ## Future Work
 
-- [ ] FastAPI API layer (`app/api/`)
 - [ ] Frontend (`frontend/`)

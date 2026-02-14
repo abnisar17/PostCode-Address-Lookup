@@ -60,8 +60,18 @@ PostcodeAddressLookup/
 │   │   │   ├── osm.py                # Pure parser: .pbf path → Iterator[list[OSMAddressRecord]]
 │   │   │   └── merge.py              # link_postcodes(), score_confidence(), deduplicate()
 │   │   │
-│   │   └── api/                      # API LAYER — depends on core only (built later)
-│   │       └── __init__.py
+│   │   └── api/                      # API LAYER — depends on core only
+│   │       ├── __init__.py
+│   │       ├── main.py              # App factory + module-level app for uvicorn
+│   │       ├── deps.py              # FastAPI DI (Settings, DB session)
+│   │       ├── schemas.py           # Pydantic v2 response models
+│   │       ├── errors.py            # Exception → HTTP status mapping
+│   │       ├── run.py               # uvicorn entry point for `uv run serve`
+│   │       └── routers/
+│   │           ├── __init__.py
+│   │           ├── health.py        # GET /health
+│   │           ├── postcodes.py     # GET /postcodes/autocomplete, /postcodes/{postcode}
+│   │           └── addresses.py     # GET /addresses/search, /addresses/{id}
 │   │
 │   └── tests/
 │       ├── __init__.py
@@ -106,7 +116,7 @@ The database schema (defined in `core/db/models.py`) is the contract between the
 ## Tech Stack
 
 - **Python 3.12** with **uv** (no pip/bare python)
-- **FastAPI** (installed now, API built later)
+- **FastAPI** with auto-generated Swagger UI at `/docs`
 - **PostgreSQL 16 + PostGIS 3.4** via Docker Compose
 - **osmium** (PyPI package name) for OSM .pbf parsing
 - **SQLAlchemy 2.x + GeoAlchemy2 + psycopg3** for database
@@ -322,6 +332,7 @@ def deduplicate(session_factory) -> int:
 **docker-compose.yml** (at repo root): Three services:
 - `db`: `postgis/postgis:16-3.4-alpine` with healthcheck (`pg_isready`)
 - `backend`: Build from `./backend`, mounts `./data:/data`, `entrypoint: ["uv", "run"]`
+- `backend`: Runs `uv run serve` (FastAPI on port 8000)
 - `frontend`: (commented out, added later) Build from `./frontend`, port 3000
 
 Usage: `docker compose run backend ingest all`
@@ -345,6 +356,9 @@ init:             cd backend && uv run ingest init-db
 download:         cd backend && uv run ingest download
 ingest:           cd backend && uv run ingest all
 status:           cd backend && uv run ingest status
+
+# API
+serve:            cd backend && uv run serve
 
 # Testing
 test:             cd backend && uv run pytest
