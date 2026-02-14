@@ -61,7 +61,7 @@ def autocomplete_postcodes(
     q: str = Query(
         ...,
         min_length=2,
-        max_length=7,
+        max_length=8,
         description=(
             "Postcode prefix to search for (minimum 2 characters). "
             "Spaces are stripped automatically. Case-insensitive."
