@@ -17,11 +17,11 @@ uv.lock
 .env
 
 # Data files (large downloads)
-data/*.pbf
-data/*.zip
-data/*.csv
-data/*.tmp
-!data/.gitkeep
+backend/data/*.pbf
+backend/data/*.zip
+backend/data/*.csv
+backend/data/*.tmp
+!backend/data/.gitkeep
 
 # IDE
 .vscode/
