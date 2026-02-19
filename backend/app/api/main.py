@@ -5,7 +5,7 @@ handlers, and structured logging. The module-level ``app`` instance is
 the ASGI entry point used by uvicorn.
 """
 
-from fastapi import FastAPI
+from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.errors import register_exception_handlers
@@ -27,10 +27,10 @@ def create_app() -> FastAPI:
             "Postcode Lookup (NSPL), and OpenStreetMap address extracts. The database contains "
             "~2.7 million postcodes and ~800K addresses.\n\n"
             "## Quick Start\n\n"
-            "1. **Look up a postcode:** `GET /postcodes/SW1A1AA`\n"
-            "2. **Autocomplete:** `GET /postcodes/autocomplete?q=SW1A`\n"
-            "3. **Search addresses:** `GET /addresses/search?city=London&street=Downing`\n"
-            "4. **Health check:** `GET /health`\n"
+            "1. **Look up a postcode:** `GET /api/postcodes/SW1A1AA`\n"
+            "2. **Autocomplete:** `GET /api/postcodes/autocomplete?q=SW1A`\n"
+            "3. **Search addresses:** `GET /api/addresses/search?city=London&street=Downing`\n"
+            "4. **Health check:** `GET /api/health`\n"
         ),
         version="0.1.0",
         docs_url="/docs",
@@ -73,10 +73,12 @@ def create_app() -> FastAPI:
     # Exception handlers
     register_exception_handlers(application)
 
-    # Routers
-    application.include_router(health.router)
-    application.include_router(postcodes.router)
-    application.include_router(addresses.router)
+    # Routers — all under /api prefix
+    api = APIRouter(prefix="/api")
+    api.include_router(health.router)
+    api.include_router(postcodes.router)
+    api.include_router(addresses.router)
+    application.include_router(api)
 
     return application
 
