@@ -20,7 +20,7 @@ export class ApiError extends Error {
 }
 
 async function get<T>(path: string, params?: Record<string, string | number>): Promise<T> {
-	const url = new URL(path, BASE_URL);
+	const url = new URL(BASE_URL + path);
 	if (params) {
 		for (const [key, value] of Object.entries(params)) {
 			if (value !== undefined && value !== null && value !== '') {
