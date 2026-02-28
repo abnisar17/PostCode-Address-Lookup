@@ -25,9 +25,18 @@
 				<span class="inline-block h-2 w-2 rounded-full bg-green-500"></span>
 				<span>API connected</span>
 			</div>
-			<div class="flex gap-4">
+			<div class="flex flex-wrap gap-4">
 				<span>{health.postcode_count.toLocaleString()} postcodes</span>
 				<span>{health.address_count.toLocaleString()} addresses</span>
+				{#if health.price_paid_count > 0}
+					<span>{health.price_paid_count.toLocaleString()} price records</span>
+				{/if}
+				{#if health.company_count > 0}
+					<span>{health.company_count.toLocaleString()} companies</span>
+				{/if}
+				{#if health.food_rating_count > 0}
+					<span>{health.food_rating_count.toLocaleString()} food ratings</span>
+				{/if}
 			</div>
 		{:else if error}
 			<div class="flex items-center gap-2">
