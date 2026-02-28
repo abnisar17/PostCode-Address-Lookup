@@ -100,6 +100,7 @@ class PricePaidResponse(BaseModel):
         if isinstance(v, datetime.date):
             return v.isoformat()
         return v
+
     property_type: str | None = Field(
         default=None,
         description="D=Detached, S=Semi-detached, T=Terraced, F=Flat, O=Other",
@@ -146,6 +147,14 @@ class FoodRatingResponse(BaseModel):
         description="Hygiene rating: 0-5, Exempt, or AwaitingInspection",
     )
     rating_date: str | None = Field(default=None, description="Date of last inspection")
+
+    @field_validator("rating_date", mode="before")
+    @classmethod
+    def _coerce_date(cls, v: object) -> str | None:
+        if isinstance(v, datetime.date):
+            return v.isoformat()
+        return v
+
     scores_hygiene: int | None = Field(default=None, description="Hygiene score")
     scores_structural: int | None = Field(default=None, description="Structural score")
     scores_management: int | None = Field(
