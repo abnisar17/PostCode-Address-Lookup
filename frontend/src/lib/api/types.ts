@@ -104,6 +104,9 @@ export interface AddressResponse {
 export interface PostcodeLookupResponse {
 	postcode: PostcodeResponse;
 	address_count: number;
+	total: number;
+	page: number;
+	page_size: number;
 	addresses: AddressResponse[];
 }
 

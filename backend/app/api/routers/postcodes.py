@@ -5,7 +5,7 @@ autocomplete for building type-ahead search UIs.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -160,6 +160,17 @@ async def lookup_postcode(
         ),
         examples=["SW1A1AA", "SW1A 1AA", "EC1A1BB"],
     ),
+    page: int = Query(
+        default=1,
+        ge=1,
+        description="Page number (1-indexed)",
+    ),
+    page_size: int = Query(
+        default=20,
+        ge=1,
+        le=100,
+        description="Number of addresses per page (max 100)",
+    ),
     db: AsyncSession = Depends(get_db),
 ) -> PostcodeLookupResponse:
     normalised = normalise_postcode(postcode)
@@ -181,6 +192,16 @@ async def lookup_postcode(
             detail=f"Postcode '{normalised}' not found",
         )
 
+    # Total address count for this postcode
+    total = (
+        await db.scalar(
+            select(func.count(Address.id)).where(Address.postcode_id == postcode_row.id)
+        )
+        or 0
+    )
+
+    offset = (page - 1) * page_size
+
     # Eager-load enrichment relationships to avoid N+1 queries
     addr_stmt = (
         select(Address)
@@ -192,6 +213,8 @@ async def lookup_postcode(
             selectinload(Address.voa_rating_records),
         )
         .order_by(Address.street, Address.house_number)
+        .offset(offset)
+        .limit(page_size)
     )
     addr_result = await db.execute(addr_stmt)
     addresses = addr_result.scalars().all()
@@ -199,5 +222,8 @@ async def lookup_postcode(
     return PostcodeLookupResponse(
         postcode=PostcodeResponse.model_validate(postcode_row),
         address_count=len(addresses),
+        total=total,
+        page=page,
+        page_size=page_size,
         addresses=[_build_address_detail(a) for a in addresses],
     )

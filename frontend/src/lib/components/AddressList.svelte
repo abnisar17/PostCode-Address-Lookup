@@ -5,12 +5,22 @@
 	let {
 		postcode,
 		addresses,
-		count
+		count,
+		page = 1,
+		pageSize = 20,
+		total = 0,
+		onpagechange
 	}: {
 		postcode: PostcodeResponse;
 		addresses: AddressResponse[];
 		count: number;
+		page?: number;
+		pageSize?: number;
+		total?: number;
+		onpagechange?: (page: number) => void;
 	} = $props();
+
+	let totalPages = $derived(Math.max(1, Math.ceil(total / pageSize)));
 </script>
 
 <div class="space-y-4">
@@ -21,9 +31,9 @@
 		</div>
 		{#if postcode.latitude != null && postcode.longitude != null}
 			<p class="mt-1 text-sm text-blue-600">
-				{postcode.latitude.toFixed(4)}&#176;N, {Math.abs(postcode.longitude).toFixed(
+				{postcode.latitude.toFixed(4)}&deg;N, {Math.abs(postcode.longitude).toFixed(
 					4
-				)}&#176;{postcode.longitude >= 0 ? 'E' : 'W'}
+				)}&deg;{postcode.longitude >= 0 ? 'E' : 'W'}
 			</p>
 		{/if}
 		{#if postcode.local_authority}
@@ -44,5 +54,27 @@
 				<AddressCard {address} />
 			{/each}
 		</div>
+
+		{#if totalPages > 1 && onpagechange}
+			<div class="flex items-center justify-between border-t border-gray-200 pt-4">
+				<button
+					class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+					disabled={page <= 1}
+					onclick={() => onpagechange(page - 1)}
+				>
+					Previous
+				</button>
+				<span class="text-sm text-gray-600">
+					Page {page} of {totalPages}
+				</span>
+				<button
+					class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+					disabled={page >= totalPages}
+					onclick={() => onpagechange(page + 1)}
+				>
+					Next
+				</button>
+			</div>
+		{/if}
 	{/if}
 </div>

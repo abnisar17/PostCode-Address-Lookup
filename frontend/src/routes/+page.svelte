@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { api, ApiError } from '$lib/api/client';
 	import type { PostcodeLookupResponse } from '$lib/api/types';
 	import TabSwitcher from '$lib/components/TabSwitcher.svelte';
 	import PostcodeSearch from '$lib/components/PostcodeSearch.svelte';
@@ -33,6 +34,27 @@
 			error = null;
 		}
 	}
+
+	async function handlePageChange(page: number) {
+		if (!lookupResult) return;
+		loading = true;
+		try {
+			const result = await api.lookupPostcode(
+				lookupResult.postcode.postcode_no_space,
+				page,
+				lookupResult.page_size
+			);
+			lookupResult = result;
+		} catch (err) {
+			if (err instanceof ApiError) {
+				error = err.detail;
+			} else {
+				error = 'Failed to load page. Please try again.';
+			}
+		} finally {
+			loading = false;
+		}
+	}
 </script>
 
 <div class="space-y-6">
@@ -58,7 +80,11 @@
 			<AddressList
 				postcode={lookupResult.postcode}
 				addresses={lookupResult.addresses}
-				count={lookupResult.address_count}
+				count={lookupResult.total}
+				page={lookupResult.page}
+				pageSize={lookupResult.page_size}
+				total={lookupResult.total}
+				onpagechange={handlePageChange}
 			/>
 		{:else}
 			<div class="py-12 text-center text-gray-400">

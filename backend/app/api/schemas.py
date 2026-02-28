@@ -285,20 +285,25 @@ class AddressListResponse(BaseModel):
 # ── Postcode Lookup (primary endpoint) ───────────────────────────
 
 class PostcodeLookupResponse(BaseModel):
-    """Full postcode lookup result: postcode metadata plus all addresses at that postcode.
+    """Full postcode lookup result: postcode metadata plus addresses at that postcode.
 
     This is the primary response for the `GET /postcodes/{postcode}` endpoint —
-    the main use case of the API.
+    the main use case of the API.  Results are paginated.
     """
 
     postcode: PostcodeResponse = Field(
         description="Postcode geographic and administrative details",
     )
     address_count: int = Field(
+        description="Number of addresses in this page",
+    )
+    total: int = Field(
         description="Total number of addresses linked to this postcode",
     )
+    page: int = Field(description="Current page number (1-indexed)")
+    page_size: int = Field(description="Maximum number of results per page")
     addresses: list[AddressDetailResponse] = Field(
-        description="All addresses at this postcode with enrichment data",
+        description="Addresses at this postcode with enrichment data (paginated)",
     )
 
 

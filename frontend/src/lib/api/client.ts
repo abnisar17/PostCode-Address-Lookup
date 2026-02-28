@@ -48,8 +48,8 @@ export const api = {
 		return get<PostcodeAutocompleteResponse>('/postcodes/autocomplete', { q, limit });
 	},
 
-	lookupPostcode(postcode: string): Promise<PostcodeLookupResponse> {
-		return get<PostcodeLookupResponse>(`/postcodes/${encodeURIComponent(postcode)}`);
+	lookupPostcode(postcode: string, page: number = 1, page_size: number = 20): Promise<PostcodeLookupResponse> {
+		return get<PostcodeLookupResponse>(`/postcodes/${encodeURIComponent(postcode)}`, { page, page_size });
 	},
 
 	searchAddresses(params: {
