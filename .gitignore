@@ -21,6 +21,7 @@ backend/data/*.pbf
 backend/data/*.zip
 backend/data/*.csv
 backend/data/*.tmp
+backend/data/epc/
 !backend/data/.gitkeep
 
 # IDE

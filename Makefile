@@ -1,4 +1,4 @@
-.PHONY: help db db-stop init download ingest status test test-unit test-integration lint format shell serve install fe-install fe-dev fe-build fe-preview fe-lint fe-format fe-check
+.PHONY: help db db-stop init download ingest ingest-lr ingest-uprn ingest-companies ingest-fsa ingest-epc ingest-voa status test test-unit test-integration lint format shell serve install fe-install fe-dev fe-build fe-preview fe-lint fe-format fe-check
 
 .DEFAULT_GOAL := help
 
@@ -13,7 +13,13 @@ help: ## Show this help
 	@echo "Backend — Ingestion"
 	@echo "  init            Create database tables"
 	@echo "  download        Download source data"
-	@echo "  ingest          Run full ingestion pipeline"
+	@echo "  ingest          Run full ingestion pipeline (all sources)"
+	@echo "  ingest-lr       Load Land Registry price paid data"
+	@echo "  ingest-uprn     Load OS Open UPRN coordinates"
+	@echo "  ingest-companies Load Companies House data"
+	@echo "  ingest-fsa      Load FSA food ratings (from API)"
+	@echo "  ingest-epc      Load EPC certificates (requires manual download)"
+	@echo "  ingest-voa      Load VOA non-domestic rating list"
 	@echo "  status          Show ingestion status"
 	@echo ""
 	@echo "Backend — API"
@@ -57,6 +63,24 @@ download:
 
 ingest:
 	cd backend && uv run ingest all
+
+ingest-lr:
+	cd backend && uv run ingest load-land-registry
+
+ingest-uprn:
+	cd backend && uv run ingest load-uprn
+
+ingest-companies:
+	cd backend && uv run ingest load-companies
+
+ingest-fsa:
+	cd backend && uv run ingest load-fsa
+
+ingest-epc:
+	cd backend && uv run ingest load-epc
+
+ingest-voa:
+	cd backend && uv run ingest load-voa
 
 status:
 	cd backend && uv run ingest status
