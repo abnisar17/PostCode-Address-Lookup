@@ -4,6 +4,7 @@ from geoalchemy2 import Geometry
 from sqlalchemy import (
     BigInteger,
     Boolean,
+    Date,
     DateTime,
     Float,
     ForeignKey,
@@ -88,8 +89,11 @@ class Address(Base):
     __tablename__ = "addresses"
     __table_args__ = (
         UniqueConstraint("osm_id", "osm_type", name="uq_addresses_osm"),
+        UniqueConstraint("source", "source_id", name="uq_addresses_source"),
         Index("ix_addresses_postcode_norm", "postcode_norm"),
         Index("ix_addresses_location", "location", postgresql_using="gist"),
+        Index("ix_addresses_uprn", "uprn"),
+        Index("ix_addresses_source", "source"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -100,7 +104,7 @@ class Address(Base):
     postcode_norm: Mapped[str | None] = mapped_column(String(10))
 
     # Address fields
-    house_number: Mapped[str | None] = mapped_column(String(50))
+    house_number: Mapped[str | None] = mapped_column(String(100))
     house_name: Mapped[str | None] = mapped_column(String(200))
     flat: Mapped[str | None] = mapped_column(String(50))
     street: Mapped[str | None] = mapped_column(String(200))
@@ -113,9 +117,14 @@ class Address(Base):
     latitude: Mapped[float | None] = mapped_column(Float)
     longitude: Mapped[float | None] = mapped_column(Float)
 
-    # OSM identifiers (unique constraint for idempotency)
+    # OSM identifiers (kept for backward compatibility)
     osm_id: Mapped[int | None] = mapped_column(BigInteger)
     osm_type: Mapped[str | None] = mapped_column(String(10))
+
+    # Multi-source support
+    source: Mapped[str | None] = mapped_column(String(20))  # osm, land_registry, epc, companies_house, fsa
+    source_id: Mapped[str | None] = mapped_column(String(100))  # unique ID from original dataset
+    uprn: Mapped[int | None] = mapped_column(BigInteger)  # Unique Property Reference Number
 
     # Quality
     confidence: Mapped[float | None] = mapped_column(Float, default=0.0)
@@ -127,3 +136,184 @@ class Address(Base):
 
     # Relationships
     postcode_ref: Mapped[Postcode | None] = relationship(back_populates="addresses")
+    price_paid_records: Mapped[list["PricePaid"]] = relationship(back_populates="address")
+    company_records: Mapped[list["Company"]] = relationship(back_populates="address")
+    food_rating_records: Mapped[list["FoodRating"]] = relationship(back_populates="address")
+    voa_rating_records: Mapped[list["VOARating"]] = relationship(back_populates="address")
+
+
+# ---------------------------------------------------------------------------
+# Enrichment tables
+# ---------------------------------------------------------------------------
+
+
+class PricePaid(Base):
+    """HM Land Registry Price Paid Data — house sale transactions."""
+
+    __tablename__ = "price_paid"
+    __table_args__ = (
+        Index("ix_price_paid_postcode_norm", "postcode_norm"),
+        Index("ix_price_paid_date", "date_of_transfer"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    transaction_id: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    address_id: Mapped[int | None] = mapped_column(
+        ForeignKey("addresses.id"), index=True
+    )
+    postcode_norm: Mapped[str | None] = mapped_column(String(10))
+
+    # Transaction details
+    price: Mapped[int] = mapped_column(Integer, nullable=False)
+    date_of_transfer: Mapped[datetime | None] = mapped_column(Date)
+    property_type: Mapped[str | None] = mapped_column(String(1))  # D/S/T/F/O
+    old_new: Mapped[str | None] = mapped_column(String(1))  # Y=new, N=existing
+    duration: Mapped[str | None] = mapped_column(String(1))  # F=freehold, L=leasehold
+
+    # Address as recorded in Land Registry
+    paon: Mapped[str | None] = mapped_column(String(100))  # house number/name
+    saon: Mapped[str | None] = mapped_column(String(100))  # flat/sub-building
+    street: Mapped[str | None] = mapped_column(String(200))
+    locality: Mapped[str | None] = mapped_column(String(100))
+    town: Mapped[str | None] = mapped_column(String(100))
+    district: Mapped[str | None] = mapped_column(String(100))
+    county: Mapped[str | None] = mapped_column(String(100))
+
+    # Metadata
+    ppd_category: Mapped[str | None] = mapped_column(String(1))  # A=standard, B=additional
+    record_status: Mapped[str | None] = mapped_column(String(1))  # A/C/D
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    # Relationships
+    address: Mapped[Address | None] = relationship(back_populates="price_paid_records")
+
+
+class Company(Base):
+    """Companies House — registered company data."""
+
+    __tablename__ = "companies"
+    __table_args__ = (
+        Index("ix_companies_postcode_norm", "postcode_norm"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    company_number: Mapped[str] = mapped_column(String(10), unique=True, nullable=False)
+    company_name: Mapped[str | None] = mapped_column(String(300))
+    company_status: Mapped[str | None] = mapped_column(String(50))
+    company_type: Mapped[str | None] = mapped_column(String(100))
+    sic_code_1: Mapped[str | None] = mapped_column(String(10))
+    sic_code_2: Mapped[str | None] = mapped_column(String(10))
+    sic_code_3: Mapped[str | None] = mapped_column(String(10))
+    sic_code_4: Mapped[str | None] = mapped_column(String(10))
+    incorporation_date: Mapped[str | None] = mapped_column(String(10))
+
+    address_id: Mapped[int | None] = mapped_column(
+        ForeignKey("addresses.id"), index=True
+    )
+    postcode_norm: Mapped[str | None] = mapped_column(String(10))
+    address_line_1: Mapped[str | None] = mapped_column(String(200))
+    address_line_2: Mapped[str | None] = mapped_column(String(200))
+    post_town: Mapped[str | None] = mapped_column(String(100))
+    county: Mapped[str | None] = mapped_column(String(100))
+    country: Mapped[str | None] = mapped_column(String(100))
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    # Relationships
+    address: Mapped[Address | None] = relationship(back_populates="company_records")
+
+
+class FoodRating(Base):
+    """FSA Food Hygiene Ratings."""
+
+    __tablename__ = "food_ratings"
+    __table_args__ = (
+        Index("ix_food_ratings_postcode_norm", "postcode_norm"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    fhrs_id: Mapped[int] = mapped_column(Integer, unique=True, nullable=False)
+    business_name: Mapped[str | None] = mapped_column(String(300))
+    business_type: Mapped[str | None] = mapped_column(String(100))
+    business_type_id: Mapped[int | None] = mapped_column(Integer)
+    rating_value: Mapped[str | None] = mapped_column(String(30))
+    rating_date: Mapped[datetime | None] = mapped_column(Date)
+
+    address_id: Mapped[int | None] = mapped_column(
+        ForeignKey("addresses.id"), index=True
+    )
+    postcode_norm: Mapped[str | None] = mapped_column(String(10))
+    address_line_1: Mapped[str | None] = mapped_column(String(200))
+    address_line_2: Mapped[str | None] = mapped_column(String(200))
+    address_line_3: Mapped[str | None] = mapped_column(String(200))
+    address_line_4: Mapped[str | None] = mapped_column(String(200))
+
+    latitude: Mapped[float | None] = mapped_column(Float)
+    longitude: Mapped[float | None] = mapped_column(Float)
+
+    local_authority_code: Mapped[str | None] = mapped_column(String(10))
+    local_authority_name: Mapped[str | None] = mapped_column(String(100))
+    scores_hygiene: Mapped[int | None] = mapped_column(Integer)
+    scores_structural: Mapped[int | None] = mapped_column(Integer)
+    scores_management: Mapped[int | None] = mapped_column(Integer)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    # Relationships
+    address: Mapped[Address | None] = relationship(back_populates="food_rating_records")
+
+
+class VOARating(Base):
+    """VOA Non-Domestic Rating List — commercial property valuations."""
+
+    __tablename__ = "voa_ratings"
+    __table_args__ = (
+        Index("ix_voa_ratings_postcode_norm", "postcode_norm"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    uarn: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)
+    billing_authority_code: Mapped[str | None] = mapped_column(String(10))
+    description_code: Mapped[str | None] = mapped_column(String(10))
+    description_text: Mapped[str | None] = mapped_column(String(60))
+    firm_name: Mapped[str | None] = mapped_column(String(200))
+
+    address_id: Mapped[int | None] = mapped_column(
+        ForeignKey("addresses.id"), index=True
+    )
+    postcode_norm: Mapped[str | None] = mapped_column(String(10))
+    number_or_name: Mapped[str | None] = mapped_column(String(100))
+    street: Mapped[str | None] = mapped_column(String(200))
+    town: Mapped[str | None] = mapped_column(String(100))
+    postal_district: Mapped[str | None] = mapped_column(String(100))
+    county: Mapped[str | None] = mapped_column(String(100))
+    sub_street_1: Mapped[str | None] = mapped_column(String(100))
+    sub_street_2: Mapped[str | None] = mapped_column(String(100))
+    sub_street_3: Mapped[str | None] = mapped_column(String(100))
+
+    rateable_value: Mapped[int | None] = mapped_column(Integer)
+    effective_date: Mapped[str | None] = mapped_column(String(11))
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    # Relationships
+    address: Mapped[Address | None] = relationship(back_populates="voa_rating_records")
+
+
+class UPRNCoordinate(Base):
+    """OS Open UPRN — coordinate lookup table for geocoding via UPRN."""
+
+    __tablename__ = "uprn_coordinates"
+
+    uprn: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    latitude: Mapped[float] = mapped_column(Float, nullable=False)
+    longitude: Mapped[float] = mapped_column(Float, nullable=False)
