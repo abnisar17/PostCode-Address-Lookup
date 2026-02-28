@@ -1,14 +1,24 @@
 """Address endpoints — search and individual lookup.
 
 Provides filtered search across all addresses (by street, city, postcode, etc.)
-with offset pagination, plus retrieval of a single address by its database ID.
+with offset pagination, plus retrieval of a single address by its database ID
+including linked enrichment data (house prices, companies, food ratings).
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.api.deps import get_db
-from app.api.schemas import AddressListResponse, AddressResponse, ErrorResponse
+from app.api.schemas import (
+    AddressDetailResponse,
+    AddressListResponse,
+    AddressResponse,
+    CompanyResponse,
+    ErrorResponse,
+    FoodRatingResponse,
+    PricePaidResponse,
+    VOARatingResponse,
+)
 from app.core.db.models import Address
 from app.core.utils.postcode import normalise_postcode
 
@@ -53,6 +63,8 @@ router = APIRouter(prefix="/addresses", tags=["Addresses"])
                                 "longitude": -0.1276,
                                 "confidence": 0.95,
                                 "is_complete": True,
+                                "source": "osm",
+                                "uprn": None,
                             }
                         ],
                     }
@@ -89,6 +101,11 @@ def search_addresses(
         default=None,
         description="Filter by city or town (case-insensitive partial match)",
         examples=["London"],
+    ),
+    source: str | None = Query(
+        default=None,
+        description="Filter by data source (osm, land_registry, epc, companies_house, fsa, voa)",
+        examples=["osm"],
     ),
     page: int = Query(
         default=1,
@@ -131,6 +148,8 @@ def search_addresses(
         query = query.filter(Address.street.ilike(f"%{street}%"))
     if city:
         query = query.filter(Address.city.ilike(f"%{city}%"))
+    if source:
+        query = query.filter(Address.source == source)
 
     total = query.count()
     offset = (page - 1) * page_size
@@ -154,15 +173,16 @@ def search_addresses(
 
 @router.get(
     "/{address_id}",
-    response_model=AddressResponse,
-    summary="Get a single address by ID",
+    response_model=AddressDetailResponse,
+    summary="Get a single address by ID with enrichment data",
     description=(
         "Retrieve the full details of a single address using its "
-        "internal database identifier. Useful for deep-linking to a "
+        "internal database identifier, including linked house prices, "
+        "companies, and food ratings. Useful for deep-linking to a "
         "specific address from search results."
     ),
     responses={
-        200: {"description": "Address found"},
+        200: {"description": "Address found with enrichment data"},
         404: {
             "model": ErrorResponse,
             "description": "No address exists with the given ID",
@@ -175,11 +195,35 @@ def get_address(
         examples=[1, 42, 10500],
     ),
     db: Session = Depends(get_db),
-) -> AddressResponse:
-    address = db.get(Address, address_id)
+) -> AddressDetailResponse:
+    address = (
+        db.query(Address)
+        .filter(Address.id == address_id)
+        .options(
+            joinedload(Address.price_paid_records),
+            joinedload(Address.company_records),
+            joinedload(Address.food_rating_records),
+            joinedload(Address.voa_rating_records),
+        )
+        .first()
+    )
     if address is None:
         raise HTTPException(
             status_code=404,
             detail=f"Address with id {address_id} not found",
         )
-    return AddressResponse.model_validate(address)
+
+    detail = AddressDetailResponse.model_validate(address)
+    detail.price_paid = [
+        PricePaidResponse.model_validate(pp) for pp in address.price_paid_records
+    ]
+    detail.companies = [
+        CompanyResponse.model_validate(c) for c in address.company_records
+    ]
+    detail.food_ratings = [
+        FoodRatingResponse.model_validate(fr) for fr in address.food_rating_records
+    ]
+    detail.voa_ratings = [
+        VOARatingResponse.model_validate(vr) for vr in address.voa_rating_records
+    ]
+    return detail

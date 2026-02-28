@@ -5,16 +5,20 @@ autocomplete for building type-ahead search UIs.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.api.deps import get_db
 from app.api.schemas import (
-    AddressResponse,
+    AddressDetailResponse,
+    CompanyResponse,
     ErrorResponse,
+    FoodRatingResponse,
     PostcodeAutocompleteItem,
     PostcodeAutocompleteResponse,
     PostcodeLookupResponse,
     PostcodeResponse,
+    PricePaidResponse,
+    VOARatingResponse,
 )
 from app.core.db.models import Address, Postcode
 from app.core.utils.postcode import normalise_postcode, postcode_no_space
@@ -99,13 +103,32 @@ def autocomplete_postcodes(
 # ── Postcode Lookup ──────────────────────────────────────────────
 
 
+def _build_address_detail(address: Address) -> AddressDetailResponse:
+    """Build an AddressDetailResponse from an Address ORM model with eager-loaded relations."""
+    base = AddressDetailResponse.model_validate(address)
+    base.price_paid = [
+        PricePaidResponse.model_validate(pp) for pp in address.price_paid_records
+    ]
+    base.companies = [
+        CompanyResponse.model_validate(c) for c in address.company_records
+    ]
+    base.food_ratings = [
+        FoodRatingResponse.model_validate(fr) for fr in address.food_rating_records
+    ]
+    base.voa_ratings = [
+        VOARatingResponse.model_validate(vr) for vr in address.voa_rating_records
+    ]
+    return base
+
+
 @router.get(
     "/{postcode}",
     response_model=PostcodeLookupResponse,
     summary="Look up a postcode and its addresses",
     description=(
         "**Primary endpoint.** Given a UK postcode, returns the postcode's "
-        "geographic metadata and every address linked to it.\n\n"
+        "geographic metadata and every address linked to it, including "
+        "enrichment data (house prices, companies, food ratings).\n\n"
         "The postcode is normalised automatically — `sw1a1aa`, `SW1A 1AA`, and "
         "`sw1a 1aa` all resolve to the same record.\n\n"
         "Addresses are sorted by street name, then house number."
@@ -156,9 +179,16 @@ def lookup_postcode(
             detail=f"Postcode '{normalised}' not found",
         )
 
+    # Eager-load enrichment relationships to avoid N+1 queries
     addresses = (
         db.query(Address)
         .filter(Address.postcode_id == postcode_row.id)
+        .options(
+            joinedload(Address.price_paid_records),
+            joinedload(Address.company_records),
+            joinedload(Address.food_rating_records),
+            joinedload(Address.voa_rating_records),
+        )
         .order_by(Address.street, Address.house_number)
         .all()
     )
@@ -166,5 +196,5 @@ def lookup_postcode(
     return PostcodeLookupResponse(
         postcode=PostcodeResponse.model_validate(postcode_row),
         address_count=len(addresses),
-        addresses=[AddressResponse.model_validate(a) for a in addresses],
+        addresses=[_build_address_detail(a) for a in addresses],
     )

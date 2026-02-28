@@ -21,16 +21,17 @@ def create_app() -> FastAPI:
         title="UK Postcode & Address Lookup API",
         summary="Look up UK postcodes and their associated addresses",
         description=(
-            "A read-only REST API for querying UK postcodes and addresses.\n\n"
-            "**Primary use case:** enter a postcode, get back every address at that postcode.\n\n"
-            "Data is sourced from Ordnance Survey Code-Point Open, the ONS National Statistics "
-            "Postcode Lookup (NSPL), and OpenStreetMap address extracts. The database contains "
-            "~2.7 million postcodes and ~800K addresses.\n\n"
+            "A read-only REST API for querying UK postcodes and addresses with enrichment data.\n\n"
+            "**Primary use case:** enter a postcode, get back every address at that postcode "
+            "with linked house prices, company registrations, and food hygiene ratings.\n\n"
+            "Data is sourced from Ordnance Survey Code-Point Open, ONS NSPL, OpenStreetMap, "
+            "HM Land Registry, EPC Open Data, Companies House, and FSA Food Hygiene Ratings.\n\n"
             "## Quick Start\n\n"
             "1. **Look up a postcode:** `GET /api/postcodes/SW1A1AA`\n"
             "2. **Autocomplete:** `GET /api/postcodes/autocomplete?q=SW1A`\n"
             "3. **Search addresses:** `GET /api/addresses/search?city=London&street=Downing`\n"
-            "4. **Health check:** `GET /api/health`\n"
+            "4. **Address detail:** `GET /api/addresses/{id}` (includes enrichment data)\n"
+            "5. **Health check:** `GET /api/health`\n"
         ),
         version="0.1.0",
         docs_url="/docs",

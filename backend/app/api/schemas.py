@@ -78,6 +78,91 @@ class PostcodeAutocompleteResponse(BaseModel):
     )
 
 
+# ── Enrichment response models ───────────────────────────────────
+
+class PricePaidResponse(BaseModel):
+    """A house sale transaction from HM Land Registry."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int = Field(description="Internal database identifier")
+    transaction_id: str = Field(description="Land Registry transaction unique ID")
+    price: int = Field(description="Sale price in GBP")
+    date_of_transfer: str | None = Field(
+        default=None, description="Date of sale (YYYY-MM-DD)"
+    )
+    property_type: str | None = Field(
+        default=None,
+        description="D=Detached, S=Semi-detached, T=Terraced, F=Flat, O=Other",
+    )
+    old_new: str | None = Field(
+        default=None, description="Y=new build, N=existing property"
+    )
+    duration: str | None = Field(
+        default=None, description="F=freehold, L=leasehold"
+    )
+
+
+class CompanyResponse(BaseModel):
+    """A registered company from Companies House."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int = Field(description="Internal database identifier")
+    company_number: str = Field(description="Companies House registration number")
+    company_name: str | None = Field(default=None, description="Registered company name")
+    company_status: str | None = Field(
+        default=None, description="Active, Dissolved, etc."
+    )
+    company_type: str | None = Field(
+        default=None, description="Ltd, PLC, LLP, etc."
+    )
+    sic_code_1: str | None = Field(default=None, description="Primary SIC code")
+    incorporation_date: str | None = Field(
+        default=None, description="Date of incorporation"
+    )
+
+
+class FoodRatingResponse(BaseModel):
+    """A food hygiene rating from the FSA."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int = Field(description="Internal database identifier")
+    fhrs_id: int = Field(description="FSA FHRS establishment ID")
+    business_name: str | None = Field(default=None, description="Business name")
+    business_type: str | None = Field(default=None, description="Type of business")
+    rating_value: str | None = Field(
+        default=None,
+        description="Hygiene rating: 0-5, Exempt, or AwaitingInspection",
+    )
+    rating_date: str | None = Field(default=None, description="Date of last inspection")
+    scores_hygiene: int | None = Field(default=None, description="Hygiene score")
+    scores_structural: int | None = Field(default=None, description="Structural score")
+    scores_management: int | None = Field(
+        default=None, description="Management confidence score"
+    )
+
+
+class VOARatingResponse(BaseModel):
+    """A non-domestic property valuation from the VOA Rating List."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int = Field(description="Internal database identifier")
+    uarn: int = Field(description="VOA Unique Address Reference Number")
+    description_text: str | None = Field(
+        default=None, description="Property type description (e.g. Shop, Office)"
+    )
+    firm_name: str | None = Field(default=None, description="Business occupying the property")
+    rateable_value: int | None = Field(
+        default=None, description="Rateable value in GBP"
+    )
+    effective_date: str | None = Field(
+        default=None, description="Valuation effective date"
+    )
+
+
 # ── Address ──────────────────────────────────────────────────────
 
 class AddressResponse(BaseModel):
@@ -135,10 +220,18 @@ class AddressResponse(BaseModel):
     )
     confidence: float | None = Field(
         default=None,
-        description="Data quality confidence score (0.0–1.0)",
+        description="Data quality confidence score (0.0-1.0)",
     )
     is_complete: bool = Field(
         description="Whether the address has all key fields populated",
+    )
+    source: str | None = Field(
+        default=None,
+        description="Data source: osm, land_registry, epc, companies_house, fsa, voa",
+    )
+    uprn: int | None = Field(
+        default=None,
+        description="Unique Property Reference Number (if known)",
     )
 
     @property
@@ -147,6 +240,27 @@ class AddressResponse(BaseModel):
         parts = [self.flat, self.house_number, self.house_name, self.street,
                  self.suburb, self.city, self.county, self.postcode_raw]
         return ", ".join(p for p in parts if p)
+
+
+class AddressDetailResponse(AddressResponse):
+    """Extended address response including linked enrichment data."""
+
+    price_paid: list[PricePaidResponse] = Field(
+        default_factory=list,
+        description="Linked house sale transactions from Land Registry",
+    )
+    companies: list[CompanyResponse] = Field(
+        default_factory=list,
+        description="Companies registered at this address",
+    )
+    food_ratings: list[FoodRatingResponse] = Field(
+        default_factory=list,
+        description="Food hygiene ratings at this address",
+    )
+    voa_ratings: list[VOARatingResponse] = Field(
+        default_factory=list,
+        description="VOA non-domestic property valuations at this address",
+    )
 
 
 class AddressListResponse(BaseModel):
@@ -174,8 +288,8 @@ class PostcodeLookupResponse(BaseModel):
     address_count: int = Field(
         description="Total number of addresses linked to this postcode",
     )
-    addresses: list[AddressResponse] = Field(
-        description="All addresses at this postcode, ordered by street then house number",
+    addresses: list[AddressDetailResponse] = Field(
+        description="All addresses at this postcode with enrichment data",
     )
 
 
@@ -197,6 +311,22 @@ class HealthResponse(BaseModel):
     )
     address_count: int = Field(
         description="Total number of addresses in the database",
+    )
+    price_paid_count: int = Field(
+        default=0,
+        description="Total number of price paid transaction records",
+    )
+    company_count: int = Field(
+        default=0,
+        description="Total number of company records",
+    )
+    food_rating_count: int = Field(
+        default=0,
+        description="Total number of food hygiene rating records",
+    )
+    voa_rating_count: int = Field(
+        default=0,
+        description="Total number of VOA non-domestic rating records",
     )
 
 
