@@ -5,12 +5,22 @@ handlers, and structured logging. The module-level ``app`` instance is
 the ASGI entry point used by uvicorn.
 """
 
+from contextlib import asynccontextmanager
+
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.deps import dispose_engine
 from app.api.errors import register_exception_handlers
 from app.api.routers import addresses, health, postcodes
 from app.core.logging import setup_logging
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Async lifespan: dispose the connection pool on shutdown."""
+    yield
+    await dispose_engine()
 
 
 def create_app() -> FastAPI:
@@ -18,6 +28,7 @@ def create_app() -> FastAPI:
     setup_logging()
 
     application = FastAPI(
+        lifespan=lifespan,
         title="UK Postcode & Address Lookup API",
         summary="Look up UK postcodes and their associated addresses",
         description=(

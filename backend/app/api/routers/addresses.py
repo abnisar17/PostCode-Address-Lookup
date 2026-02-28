@@ -6,7 +6,9 @@ including linked enrichment data (house prices, companies, food ratings).
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_db
 from app.api.schemas import (
@@ -74,7 +76,7 @@ router = APIRouter(prefix="/addresses", tags=["Addresses"])
         422: {"description": "Invalid pagination or filter parameters"},
     },
 )
-def search_addresses(
+async def search_addresses(
     q: str | None = Query(
         default=None,
         min_length=2,
@@ -118,14 +120,14 @@ def search_addresses(
         le=100,
         description="Number of results per page (max 100)",
     ),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> AddressListResponse:
-    query = db.query(Address)
+    stmt = select(Address)
 
     # General text search across multiple fields
     if q:
         pattern = f"%{q}%"
-        query = query.filter(
+        stmt = stmt.where(
             Address.street.ilike(pattern)
             | Address.city.ilike(pattern)
             | Address.house_name.ilike(pattern)
@@ -136,7 +138,7 @@ def search_addresses(
     if postcode:
         normalised = normalise_postcode(postcode)
         if normalised:
-            query = query.filter(Address.postcode_norm == normalised)
+            stmt = stmt.where(Address.postcode_norm == normalised)
         else:
             # Invalid postcode format — return empty results
             return AddressListResponse(
@@ -145,22 +147,23 @@ def search_addresses(
 
     # Individual field filters
     if street:
-        query = query.filter(Address.street.ilike(f"%{street}%"))
+        stmt = stmt.where(Address.street.ilike(f"%{street}%"))
     if city:
-        query = query.filter(Address.city.ilike(f"%{city}%"))
+        stmt = stmt.where(Address.city.ilike(f"%{city}%"))
     if source:
-        query = query.filter(Address.source == source)
+        stmt = stmt.where(Address.source == source)
 
-    total = query.count()
+    total = await db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     offset = (page - 1) * page_size
 
-    rows = (
-        query
+    paginated = (
+        stmt
         .order_by(Address.city, Address.street, Address.house_number)
         .offset(offset)
         .limit(page_size)
-        .all()
     )
+    result = await db.execute(paginated)
+    rows = result.scalars().all()
 
     return AddressListResponse(
         count=len(rows),
@@ -189,24 +192,26 @@ def search_addresses(
         },
     },
 )
-def get_address(
+async def get_address(
     address_id: int = Path(
         description="Unique database identifier for the address",
         examples=[1, 42, 10500],
     ),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> AddressDetailResponse:
-    address = (
-        db.query(Address)
-        .filter(Address.id == address_id)
+    stmt = (
+        select(Address)
+        .where(Address.id == address_id)
         .options(
-            joinedload(Address.price_paid_records),
-            joinedload(Address.company_records),
-            joinedload(Address.food_rating_records),
-            joinedload(Address.voa_rating_records),
+            selectinload(Address.price_paid_records),
+            selectinload(Address.company_records),
+            selectinload(Address.food_rating_records),
+            selectinload(Address.voa_rating_records),
         )
-        .first()
     )
+    result = await db.execute(stmt)
+    address = result.scalars().first()
+
     if address is None:
         raise HTTPException(
             status_code=404,

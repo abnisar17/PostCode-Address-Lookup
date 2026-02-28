@@ -5,8 +5,8 @@ can confirm that the data ingestion pipeline has completed successfully.
 """
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import func, text
-from sqlalchemy.orm import Session
+from sqlalchemy import func, select, text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db
 from app.api.schemas import HealthResponse
@@ -46,9 +46,9 @@ router = APIRouter(tags=["Health"])
         503: {"description": "Database is unreachable"},
     },
 )
-def check_health(db: Session = Depends(get_db)) -> HealthResponse:
+async def check_health(db: AsyncSession = Depends(get_db)) -> HealthResponse:
     try:
-        db.execute(text("SELECT 1"))
+        await db.execute(text("SELECT 1"))
         db_status = "connected"
     except Exception:
         return HealthResponse(
@@ -58,12 +58,12 @@ def check_health(db: Session = Depends(get_db)) -> HealthResponse:
             address_count=0,
         )
 
-    postcode_count = db.scalar(func.count(Postcode.id)) or 0
-    address_count = db.scalar(func.count(Address.id)) or 0
-    price_paid_count = db.scalar(func.count(PricePaid.id)) or 0
-    company_count = db.scalar(func.count(Company.id)) or 0
-    food_rating_count = db.scalar(func.count(FoodRating.id)) or 0
-    voa_rating_count = db.scalar(func.count(VOARating.id)) or 0
+    postcode_count = await db.scalar(select(func.count(Postcode.id))) or 0
+    address_count = await db.scalar(select(func.count(Address.id))) or 0
+    price_paid_count = await db.scalar(select(func.count(PricePaid.id))) or 0
+    company_count = await db.scalar(select(func.count(Company.id))) or 0
+    food_rating_count = await db.scalar(select(func.count(FoodRating.id))) or 0
+    voa_rating_count = await db.scalar(select(func.count(VOARating.id))) or 0
 
     return HealthResponse(
         status="healthy",

@@ -5,7 +5,9 @@ autocomplete for building type-ahead search UIs.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_db
 from app.api.schemas import (
@@ -61,7 +63,7 @@ router = APIRouter(prefix="/postcodes", tags=["Postcodes"])
         422: {"description": "Query parameter missing or too short"},
     },
 )
-def autocomplete_postcodes(
+async def autocomplete_postcodes(
     q: str = Query(
         ...,
         min_length=2,
@@ -78,17 +80,18 @@ def autocomplete_postcodes(
         le=50,
         description="Maximum number of suggestions to return",
     ),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> PostcodeAutocompleteResponse:
     prefix = q.strip().upper().replace(" ", "")
 
-    rows = (
-        db.query(Postcode.postcode, Postcode.postcode_no_space)
-        .filter(Postcode.postcode_no_space.startswith(prefix))
+    stmt = (
+        select(Postcode.postcode, Postcode.postcode_no_space)
+        .where(Postcode.postcode_no_space.startswith(prefix))
         .order_by(Postcode.postcode_no_space)
         .limit(limit)
-        .all()
     )
+    result = await db.execute(stmt)
+    rows = result.all()
 
     return PostcodeAutocompleteResponse(
         query=q.strip(),
@@ -148,7 +151,7 @@ def _build_address_detail(address: Address) -> AddressDetailResponse:
         },
     },
 )
-def lookup_postcode(
+async def lookup_postcode(
     postcode: str = Path(
         description=(
             "UK postcode to look up. Accepts any common format: "
@@ -157,7 +160,7 @@ def lookup_postcode(
         ),
         examples=["SW1A1AA", "SW1A 1AA", "EC1A1BB"],
     ),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> PostcodeLookupResponse:
     normalised = normalise_postcode(postcode)
     if normalised is None:
@@ -168,11 +171,10 @@ def lookup_postcode(
 
     no_space = postcode_no_space(normalised)
 
-    postcode_row = (
-        db.query(Postcode)
-        .filter(Postcode.postcode_no_space == no_space)
-        .first()
-    )
+    stmt = select(Postcode).where(Postcode.postcode_no_space == no_space)
+    result = await db.execute(stmt)
+    postcode_row = result.scalars().first()
+
     if postcode_row is None:
         raise HTTPException(
             status_code=404,
@@ -180,18 +182,19 @@ def lookup_postcode(
         )
 
     # Eager-load enrichment relationships to avoid N+1 queries
-    addresses = (
-        db.query(Address)
-        .filter(Address.postcode_id == postcode_row.id)
+    addr_stmt = (
+        select(Address)
+        .where(Address.postcode_id == postcode_row.id)
         .options(
-            joinedload(Address.price_paid_records),
-            joinedload(Address.company_records),
-            joinedload(Address.food_rating_records),
-            joinedload(Address.voa_rating_records),
+            selectinload(Address.price_paid_records),
+            selectinload(Address.company_records),
+            selectinload(Address.food_rating_records),
+            selectinload(Address.voa_rating_records),
         )
         .order_by(Address.street, Address.house_number)
-        .all()
     )
+    addr_result = await db.execute(addr_stmt)
+    addresses = addr_result.scalars().all()
 
     return PostcodeLookupResponse(
         postcode=PostcodeResponse.model_validate(postcode_row),
