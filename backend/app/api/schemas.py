@@ -6,7 +6,9 @@ exposes only the fields relevant to consumers, and flattens the
 PostGIS geometry into simple lat/lon floats.
 """
 
-from pydantic import BaseModel, ConfigDict, Field
+import datetime
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 # ── Postcode ─────────────────────────────────────────────────────
@@ -91,6 +93,13 @@ class PricePaidResponse(BaseModel):
     date_of_transfer: str | None = Field(
         default=None, description="Date of sale (YYYY-MM-DD)"
     )
+
+    @field_validator("date_of_transfer", mode="before")
+    @classmethod
+    def _coerce_date(cls, v: object) -> str | None:
+        if isinstance(v, datetime.date):
+            return v.isoformat()
+        return v
     property_type: str | None = Field(
         default=None,
         description="D=Detached, S=Semi-detached, T=Terraced, F=Flat, O=Other",

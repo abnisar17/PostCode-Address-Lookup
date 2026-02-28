@@ -18,7 +18,7 @@
 	});
 </script>
 
-<footer class="border-t border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-500">
+<footer class="fixed bottom-0 left-0 right-0 border-t border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-500">
 	<div class="mx-auto flex max-w-3xl items-center justify-between">
 		{#if health}
 			<div class="flex items-center gap-2">
