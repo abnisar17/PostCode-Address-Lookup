@@ -46,6 +46,8 @@ class Postcode(Base):
     __tablename__ = "postcodes"
     __table_args__ = (
         Index("ix_postcodes_postcode_no_space", "postcode_no_space"),
+        Index("ix_postcodes_postcode_no_space_pattern", "postcode_no_space",
+              postgresql_ops={"postcode_no_space": "varchar_pattern_ops"}),
         Index("ix_postcodes_location", "location", postgresql_using="gist"),
     )
 
@@ -102,6 +104,7 @@ class Address(Base):
               postgresql_ops={"house_name": "gin_trgm_ops"}),
         Index("ix_addresses_suburb_trgm", "suburb", postgresql_using="gin",
               postgresql_ops={"suburb": "gin_trgm_ops"}),
+        Index("ix_addresses_postcode_street_house", "postcode_id", "street", "house_number"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
