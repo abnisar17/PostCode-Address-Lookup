@@ -6,7 +6,7 @@ including linked enrichment data (house prices, companies, food ratings).
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
-from sqlalchemy import func, select
+from sqlalchemy import func, literal_column, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -122,12 +122,19 @@ async def search_addresses(
     ),
     db: AsyncSession = Depends(get_db),
 ) -> AddressListResponse:
-    stmt = select(Address)
+    # Require at least one filter to avoid full-table scans
+    if not any([q, postcode, street, city, source]):
+        return AddressListResponse(
+            count=0, total=0, page=page, page_size=page_size, results=[]
+        )
+
+    # Build WHERE conditions once, reuse for both count and data queries
+    conditions = []
 
     # General text search across multiple fields
     if q:
         pattern = f"%{q}%"
-        stmt = stmt.where(
+        conditions.append(
             Address.street.ilike(pattern)
             | Address.city.ilike(pattern)
             | Address.house_name.ilike(pattern)
@@ -138,7 +145,7 @@ async def search_addresses(
     if postcode:
         normalised = normalise_postcode(postcode)
         if normalised:
-            stmt = stmt.where(Address.postcode_norm == normalised)
+            conditions.append(Address.postcode_norm == normalised)
         else:
             # Invalid postcode format — return empty results
             return AddressListResponse(
@@ -147,23 +154,41 @@ async def search_addresses(
 
     # Individual field filters
     if street:
-        stmt = stmt.where(Address.street.ilike(f"%{street}%"))
+        conditions.append(Address.street.ilike(f"%{street}%"))
     if city:
-        stmt = stmt.where(Address.city.ilike(f"%{city}%"))
+        conditions.append(Address.city.ilike(f"%{city}%"))
     if source:
-        stmt = stmt.where(Address.source == source)
+        conditions.append(Address.source == source)
 
-    total = await db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+    # Set a per-query statement timeout so only search queries are bounded
+    await db.execute(text("SET LOCAL statement_timeout = '10s'"))
+
+    # Capped count — stop scanning once we reach 10 000 to avoid full-table scans
+    COUNT_CAP = 10_000
+    capped_sub = (
+        select(literal_column("1"))
+        .select_from(Address)
+        .where(*conditions)
+        .limit(COUNT_CAP)
+        .subquery()
+    )
+    count_stmt = select(func.count()).select_from(capped_sub)
+
     offset = (page - 1) * page_size
 
-    paginated = (
-        stmt
-        .order_by(Address.city, Address.street, Address.house_number)
+    # ORDER BY id uses the primary-key index, avoiding a full sort of all matches
+    data_stmt = (
+        select(Address)
+        .where(*conditions)
+        .order_by(Address.id)
         .offset(offset)
         .limit(page_size)
     )
-    result = await db.execute(paginated)
+
+    result = await db.execute(data_stmt)
     rows = result.scalars().all()
+
+    total = await db.scalar(count_stmt) or 0
 
     return AddressListResponse(
         count=len(rows),

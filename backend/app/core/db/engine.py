@@ -54,11 +54,16 @@ def create_async_session_factory(engine: AsyncEngine) -> async_sessionmaker[Asyn
     return async_sessionmaker(bind=engine, expire_on_commit=False)
 
 
-def ensure_postgis(engine: Engine) -> None:
-    """Enable the PostGIS extension if not already active."""
+def ensure_extensions(engine: Engine) -> None:
+    """Enable required PostgreSQL extensions if not already active."""
     try:
         with engine.connect() as conn:
             conn.execute(text("CREATE EXTENSION IF NOT EXISTS postgis"))
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
             conn.commit()
     except Exception as exc:
-        raise DatabaseError(f"Failed to enable PostGIS: {exc}") from exc
+        raise DatabaseError(f"Failed to enable extensions: {exc}") from exc
+
+
+# Keep old name as alias so existing callers don't break
+ensure_postgis = ensure_extensions

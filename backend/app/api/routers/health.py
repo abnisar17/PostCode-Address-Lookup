@@ -5,12 +5,11 @@ can confirm that the data ingestion pipeline has completed successfully.
 """
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import func, select, text
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db
 from app.api.schemas import HealthResponse
-from app.core.db.models import Address, Company, FoodRating, Postcode, PricePaid, VOARating
 
 router = APIRouter(tags=["Health"])
 
@@ -58,12 +57,25 @@ async def check_health(db: AsyncSession = Depends(get_db)) -> HealthResponse:
             address_count=0,
         )
 
-    postcode_count = await db.scalar(select(func.count(Postcode.id))) or 0
-    address_count = await db.scalar(select(func.count(Address.id))) or 0
-    price_paid_count = await db.scalar(select(func.count(PricePaid.id))) or 0
-    company_count = await db.scalar(select(func.count(Company.id))) or 0
-    food_rating_count = await db.scalar(select(func.count(FoodRating.id))) or 0
-    voa_rating_count = await db.scalar(select(func.count(VOARating.id))) or 0
+    # Use pg_class.reltuples for fast approximate counts (instant, no table scan)
+    table_names = [
+        "postcodes", "addresses", "price_paid",
+        "companies", "food_ratings", "voa_ratings",
+    ]
+    rows = await db.execute(
+        text(
+            "SELECT relname, GREATEST(reltuples, 0)::bigint "
+            "FROM pg_class WHERE relname = ANY(:tables)"
+        ),
+        {"tables": table_names},
+    )
+    counts = dict(rows.all())
+    postcode_count = counts.get("postcodes", 0)
+    address_count = counts.get("addresses", 0)
+    price_paid_count = counts.get("price_paid", 0)
+    company_count = counts.get("companies", 0)
+    food_rating_count = counts.get("food_ratings", 0)
+    voa_rating_count = counts.get("voa_ratings", 0)
 
     return HealthResponse(
         status="healthy",

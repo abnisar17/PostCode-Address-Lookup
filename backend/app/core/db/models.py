@@ -94,6 +94,14 @@ class Address(Base):
         Index("ix_addresses_location", "location", postgresql_using="gist"),
         Index("ix_addresses_uprn", "uprn"),
         Index("ix_addresses_source", "source"),
+        Index("ix_addresses_street_trgm", "street", postgresql_using="gin",
+              postgresql_ops={"street": "gin_trgm_ops"}),
+        Index("ix_addresses_city_trgm", "city", postgresql_using="gin",
+              postgresql_ops={"city": "gin_trgm_ops"}),
+        Index("ix_addresses_house_name_trgm", "house_name", postgresql_using="gin",
+              postgresql_ops={"house_name": "gin_trgm_ops"}),
+        Index("ix_addresses_suburb_trgm", "suburb", postgresql_using="gin",
+              postgresql_ops={"suburb": "gin_trgm_ops"}),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
