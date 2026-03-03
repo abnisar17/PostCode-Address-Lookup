@@ -1,6 +1,6 @@
 # UK Postcode & Address Lookup
 
-A full-stack web application for looking up UK postcodes and their associated addresses. It ingests data from three free, open government data sources (OS CodePoint Open, ONS NSPL, OpenStreetMap), stores it in a PostgreSQL/PostGIS database, serves it through a FastAPI REST API, and presents it via a SvelteKit frontend.
+A full-stack web application for looking up UK postcodes and their associated addresses with enrichment data. It ingests data from seven free, open government data sources, stores it in a PostgreSQL/PostGIS database, serves it through a FastAPI REST API, and presents it via a SvelteKit frontend.
 
 ## Architecture
 
@@ -10,6 +10,10 @@ graph LR
         CP[OS CodePoint Open<br/>~1.7M postcodes]
         NSPL[ONS NSPL<br/>~2.7M postcodes]
         OSM[OpenStreetMap<br/>~800K addresses]
+        LR[Land Registry<br/>~31M transactions]
+        CH[Companies House<br/>~5.5M companies]
+        FSA[Food Standards Agency<br/>~505K ratings]
+        VOA[Valuation Office Agency<br/>~2.3M ratings]
     end
 
     subgraph Docker Compose
@@ -18,16 +22,16 @@ graph LR
         DB[("PostgreSQL<br/>+ PostGIS<br/>:5432")]
     end
 
-    CP & NSPL & OSM -->|ingestion CLI| BE
+    CP & NSPL & OSM & LR & CH & FSA & VOA -->|ingestion CLI| BE
     FE -->|REST API| BE
     BE --> DB
 ```
 
 The application has three main layers:
 
-- **Frontend** — SvelteKit 5 single-page application with Tailwind CSS. Provides postcode autocomplete and address search.
-- **Backend** — Python/FastAPI application with two roles: a data ingestion CLI that downloads, parses, and loads data, and a REST API with 5 endpoints.
-- **Database** — PostgreSQL 16 with PostGIS 3.4 extension for geospatial queries. Stores ~2.7M postcodes and ~800K addresses.
+- **Frontend** — SvelteKit 5 single-page application with Tailwind CSS. Provides postcode autocomplete, address search, and enrichment data display (price history, companies, food ratings, VOA ratings).
+- **Backend** — Python/FastAPI application with two roles: a data ingestion CLI that downloads, parses, and loads data from 7 sources, and a REST API with 5 endpoints.
+- **Database** — PostgreSQL 16 with PostGIS 3.4 extension for geospatial queries. Stores ~2.7M postcodes, ~69M addresses, and ~40M enrichment records.
 
 ## Tech Stack
 
@@ -35,7 +39,7 @@ The application has three main layers:
 |-------|------------|
 | Frontend | SvelteKit 5, Svelte 5 (runes), Tailwind CSS v4, TypeScript |
 | Backend | Python 3.12, FastAPI, SQLAlchemy 2, Typer CLI |
-| Database | PostgreSQL 16, PostGIS 3.4 |
+| Database | PostgreSQL 16, PostGIS 3.4, pg_trgm |
 | Ingestion | httpx (async downloads), osmium (PBF parsing), pyproj (coordinate conversion) |
 | Tooling | uv (Python), npm (Node.js), Docker Compose, Ruff, Prettier, ESLint |
 | Testing | pytest, testcontainers (real PostGIS in tests) |
@@ -179,21 +183,26 @@ This creates a `.venv` virtual environment inside `backend/` and installs all Py
 uv run ingest init-db
 ```
 
-This runs Alembic migrations to create the three database tables: `postcodes`, `addresses`, and `data_sources`.
+This runs Alembic migrations to create all database tables: `postcodes`, `addresses`, `data_sources`, `price_paid`, `companies`, `food_ratings`, `voa_ratings`, and `uprn_coordinates`.
 
-### Step 6: Download Source Data (~2.2 GB)
+### Step 6: Download Source Data (~10+ GB)
 
 ```bash
 uv run ingest download
 ```
 
-This downloads three files into the `backend/data/` folder:
+This downloads source files into the `backend/data/` folder:
 
 | File | Size | Source |
 |------|------|--------|
 | `codepoint-open.zip` | ~150 MB | Ordnance Survey — postcode coordinates |
 | `nspl.zip` | ~178 MB | ONS — administrative area codes |
 | `great-britain-latest.osm.pbf` | ~1.9 GB | Geofabrik/OpenStreetMap — building addresses |
+| `pp-complete.csv` | ~4.5 GB | Land Registry — price paid data |
+| `BasicCompanyDataAsOneFile-*.csv` | ~1.5 GB | Companies House — company registrations |
+| `osopenuprn_*.csv` | ~2.1 GB | OS Open UPRN — coordinate lookup |
+| `UK-en-*.xml` (API) | ~50 MB | FSA food hygiene ratings (fetched via API) |
+| `uk-valuation-office-agency-*.csv` | ~500 MB | VOA non-domestic rating list |
 
 Downloads are cached — if files already exist, they are skipped.
 
@@ -207,11 +216,16 @@ This runs the full pipeline in sequence:
 1. **Load CodePoint postcodes** — ~1.7M postcodes with coordinates
 2. **Merge NSPL data** — adds admin codes (region, local authority, ward) to postcodes
 3. **Load OSM addresses** — ~800K street addresses from OpenStreetMap
-4. **Link addresses to postcodes** — connects each address to its postcode via foreign key
-5. **Score confidence** — rates each address quality from 0.0 to 1.0
-6. **Deduplicate** — removes duplicate addresses, keeps highest confidence
+4. **Load Land Registry** — ~31M house sale transactions
+5. **Load UPRN coordinates** — ~35M UPRN geocoding records
+6. **Load Companies House** — ~5.5M company registrations
+7. **Load FSA food ratings** — ~505K food hygiene ratings
+8. **Load VOA ratings** — ~2.3M non-domestic property valuations
+9. **Merge** — link postcodes, geocode addresses, link enrichment data, score confidence, deduplicate
 
-**This step takes 15-60+ minutes** depending on your hardware. You will see progress bars for each stage.
+Individual sources can also be loaded separately: `make ingest-lr`, `make ingest-companies`, `make ingest-fsa`, `make ingest-voa`.
+
+**This step takes several hours** depending on your hardware and internet speed. You will see progress bars for each stage.
 
 ### Step 8: Verify Data Loaded
 
@@ -219,10 +233,13 @@ This runs the full pipeline in sequence:
 uv run ingest status
 ```
 
-You should see a table with record counts similar to:
+You should see record counts similar to:
 - Postcodes: ~2.7M
-- Addresses: ~800K
-- Link rate and average confidence scores
+- Addresses: ~69M
+- Price Paid: ~31M
+- Companies: ~5.5M
+- Food Ratings: ~505K
+- VOA Ratings: ~2.3M
 
 ### Step 9: Start the Backend API
 
@@ -322,7 +339,7 @@ PostcodeAddressLookup/
 │   │   │   ├── exceptions.py   # Custom exception hierarchy
 │   │   │   ├── db/
 │   │   │   │   ├── engine.py   # SQLAlchemy engine + session factory
-│   │   │   │   ├── models.py   # ORM models (DataSource, Postcode, Address)
+│   │   │   │   ├── models.py   # ORM models (Postcode, Address, PricePaid, Company, FoodRating, VOARating)
 │   │   │   │   ├── loader.py   # Generic batch loader with progress bars
 │   │   │   │   └── migrations/ # Alembic database migrations
 │   │   │   └── utils/
@@ -391,21 +408,62 @@ PostcodeAddressLookup/
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/health` | Health check — returns DB status and record counts |
-| GET | `/postcodes/autocomplete?q=SW1A&limit=10` | Postcode prefix search for type-ahead UI |
-| GET | `/postcodes/{postcode}` | Postcode lookup — returns postcode info + all addresses |
-| GET | `/addresses/search?q=downing&city=London&page=1&page_size=20` | Full-text address search with optional filters and pagination |
-| GET | `/addresses/{id}` | Single address by database ID |
+| GET | `/api/health` | Health check — returns DB status and record counts |
+| GET | `/api/postcodes/autocomplete?q=SW1A&limit=10` | Postcode prefix search for type-ahead UI |
+| GET | `/api/postcodes/{postcode}?page=1&page_size=20` | Postcode lookup — returns postcode info + paginated addresses with enrichment data |
+| GET | `/api/addresses/search?q=downing&city=London&page=1&page_size=20` | Full-text address search with optional filters and pagination |
+| GET | `/api/addresses/{id}` | Single address by database ID with full enrichment data (prices, companies, food ratings, VOA) |
 
 All endpoints return JSON. Full interactive documentation is available at http://localhost:8000/docs when the backend is running.
 
+### Address Sources
+
+Each address record has a `source` field indicating its origin:
+
+| Source value | Dataset | Typical content |
+|---|---|---|
+| `osm` | OpenStreetMap | Residential and commercial street addresses |
+| `land_registry` | HM Land Registry | Addresses from property sale transactions |
+| `companies_house` | Companies House | Business registration addresses |
+| `fsa` | Food Standards Agency | Food establishment addresses |
+| `voa` | Valuation Office Agency | Non-domestic property addresses |
+| `epc` | Energy Performance Certificates | Domestic building addresses |
+
+### Confidence Score
+
+Each address has a `confidence` score (0–100%) indicating data quality:
+
+- **Phase 1 (up to 80%)**: Points for having key fields — postcode (+20%), street (+15%), house number/name (+15%), city (+10%), coordinates (+10%), suburb (+5%), UPRN (+5%)
+- **Phase 2 (+15%)**: Bonus if the same address appears in 2+ different data sources
+- **Phase 3 (+5%)**: Bonus if the address has any linked enrichment data
+
 ## Data Sources
+
+### Core Address Data
 
 | Source | Records | Description |
 |--------|---------|-------------|
 | [OS CodePoint Open](https://www.ordnancesurvey.co.uk/products/code-point-open) | ~1.7M | Postcode centroids with OSGB36 coordinates (converted to WGS84) |
 | [ONS NSPL](https://geoportal.statistics.gov.uk/) | ~2.7M | National Statistics Postcode Lookup — all UK postcodes including terminated, with administrative area codes |
 | [OpenStreetMap](https://download.geofabrik.de/) | ~800K | Building addresses extracted from Great Britain PBF export |
+| [OS Open UPRN](https://www.ordnancesurvey.co.uk/products/os-open-uprn) | ~35M | UPRN to coordinate mappings for geocoding |
+
+### Enrichment Data
+
+Enrichment records are linked to addresses and provide additional context:
+
+| Source | Records | Description | What it shows |
+|--------|---------|-------------|---------------|
+| [HM Land Registry](https://www.gov.uk/government/collections/price-paid-data) | ~31M | House sale transactions | Sale price, date, property type (Detached/Semi/Terraced/Flat), Freehold/Leasehold, new build flag |
+| [Companies House](https://www.gov.uk/government/organisations/companies-house) | ~5.5M | Registered company addresses | Company name, status (Active/Dissolved), type (Ltd/PLC), SIC code, incorporation date |
+| [Food Standards Agency](https://ratings.food.gov.uk/) | ~505K | Food hygiene inspection ratings | Business name, rating (0–5), business type, hygiene/structural/management scores |
+| [Valuation Office Agency](https://www.gov.uk/government/organisations/valuation-office-agency) | ~2.3M | Non-domestic property valuations | Property description (Shop/Office/etc.), rateable value, firm name |
+
+### How enrichment linking works
+
+Each enrichment record is linked to an address via a two-phase matching process:
+1. **Exact match** — direct join on source-specific IDs (transaction ID, company number, FHRS ID, UARN)
+2. **Text fallback** — case-insensitive matching on postcode + street/address components for unmatched records
 
 ## Make Targets (Shortcut Commands)
 
