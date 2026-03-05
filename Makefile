@@ -1,16 +1,19 @@
-.PHONY: help db db-stop init download ingest ingest-lr ingest-uprn ingest-companies ingest-fsa ingest-epc ingest-voa status test test-unit test-integration lint format shell serve install fe-install fe-dev fe-build fe-preview fe-lint fe-format fe-check
+.PHONY: help up up-prod down build logs shell init download ingest ingest-lr ingest-uprn ingest-companies ingest-fsa ingest-epc ingest-voa status test test-unit test-integration lint format install fe-build fe-check
 
 .DEFAULT_GOAL := help
 
 help: ## Show this help
 	@echo "Usage: make <target>"
 	@echo ""
-	@echo "Infrastructure"
-	@echo "  db              Start PostgreSQL (detached)"
-	@echo "  db-stop         Stop all containers"
+	@echo "Docker"
+	@echo "  up              Start all services (dev mode, hot-reload)"
+	@echo "  up-prod         Start all services (production mode)"
+	@echo "  down            Stop all services"
+	@echo "  build           Rebuild Docker images"
+	@echo "  logs            Tail container logs"
 	@echo "  shell           Open psql shell"
 	@echo ""
-	@echo "Backend — Ingestion"
+	@echo "Ingestion"
 	@echo "  init            Create database tables"
 	@echo "  download        Download source data"
 	@echo "  ingest          Run full ingestion pipeline (all sources)"
@@ -22,39 +25,39 @@ help: ## Show this help
 	@echo "  ingest-voa      Load VOA non-domestic rating list"
 	@echo "  status          Show ingestion status"
 	@echo ""
-	@echo "Backend — API"
-	@echo "  serve           Start backend API server"
-	@echo ""
-	@echo "Backend — Testing"
+	@echo "Testing & Quality"
 	@echo "  test            Run all tests"
 	@echo "  test-unit       Run unit tests only"
 	@echo "  test-integration Run integration tests only"
+	@echo "  lint            Lint backend + frontend"
+	@echo "  format          Format backend + frontend"
 	@echo ""
-	@echo "Backend — Code Quality"
-	@echo "  lint            Lint backend (ruff)"
-	@echo "  format          Format backend (ruff)"
-	@echo "  install         Install backend deps (uv sync)"
-	@echo ""
-	@echo "Frontend"
-	@echo "  fe-install      Install frontend deps"
-	@echo "  fe-dev          Start frontend dev server"
-	@echo "  fe-build        Production build (static)"
-	@echo "  fe-preview      Preview production build"
-	@echo "  fe-lint         Lint frontend (eslint)"
-	@echo "  fe-format       Format frontend (prettier)"
+	@echo "Setup"
+	@echo "  install         Install all dependencies (backend + frontend)"
+	@echo "  fe-build        Production build frontend (static)"
 	@echo "  fe-check        Type-check frontend (svelte-check)"
 
-# --- Infrastructure ---
-db:
-	docker compose up db -d
+# --- Docker ---
+# docker-compose.override.yml is auto-merged, giving dev hot-reload
+up:
+	docker compose up --build
 
-db-stop:
+up-prod:
+	docker compose -f docker-compose.yml up --build
+
+down:
 	docker compose down
+
+build:
+	docker compose build
+
+logs:
+	docker compose logs -f
 
 shell:
 	docker compose exec db psql -U postgres -d postcode_lookup
 
-# --- Backend (ingestion) ---
+# --- Ingestion ---
 init:
 	cd backend && uv run ingest init-db
 
@@ -85,10 +88,6 @@ ingest-voa:
 status:
 	cd backend && uv run ingest status
 
-# --- API ---
-serve:
-	cd backend && uv run serve
-
 # --- Testing ---
 test:
 	cd backend && uv run pytest
@@ -102,32 +101,19 @@ test-integration:
 # --- Code quality ---
 lint:
 	cd backend && uv run ruff check app/ tests/
+	cd frontend && npm run lint
 
 format:
 	cd backend && uv run ruff format app/ tests/
+	cd frontend && npm run format
 
-# --- Backend deps ---
+# --- Setup ---
 install:
 	cd backend && uv sync
-
-# --- Frontend ---
-fe-install:
 	cd frontend && npm install
-
-fe-dev:
-	cd frontend && npm run dev
 
 fe-build:
 	cd frontend && npm run build
-
-fe-preview:
-	cd frontend && npm run preview
-
-fe-lint:
-	cd frontend && npm run lint
-
-fe-format:
-	cd frontend && npm run format
 
 fe-check:
 	cd frontend && npm run check

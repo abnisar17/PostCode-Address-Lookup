@@ -1,0 +1,26 @@
+# Development overrides — auto-applied by Docker Compose.
+# Mounts source code and runs dev servers for hot-reload.
+# To skip these overrides (e.g. in CI), use:
+#   docker compose -f docker-compose.yml up
+services:
+  backend:
+    volumes:
+      - ./backend/app:/backend/app
+      - ./backend/alembic.ini:/backend/alembic.ini
+      - ./backend/data:/data
+    environment:
+      # Force polling for file-watch on Docker Desktop (Windows/macOS)
+      WATCHFILES_FORCE_POLLING: "true"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/static:/app/static
+      - ./frontend/vite.config.ts:/app/vite.config.ts
+      - ./frontend/svelte.config.js:/app/svelte.config.js
+      - ./frontend/tsconfig.json:/app/tsconfig.json
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000
