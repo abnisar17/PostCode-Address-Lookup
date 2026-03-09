@@ -10,7 +10,7 @@
 --   2. JOIN against addresses with explicit house_number
 --   3. Delete the less-structured record, keep the proper one
 --
--- Safety: backup table, diagnostic counts, transaction-wrapped mutations
+-- Safety: transaction-wrapped mutations, diagnostic counts, index on pairs table
 -- Performance: Uses indexes, no window function over full table
 -- ============================================================================
 
@@ -144,38 +144,15 @@ JOIN addresses k ON k.id = p.keeper_id
 GROUP BY k.source
 ORDER BY count DESC;
 
--- Check enrichment data on duplicates (would be reassigned, not lost)
-\echo ''
-\echo 'Enrichment records on duplicate addresses (will be REASSIGNED to keeper):'
-SELECT
-    (SELECT COUNT(*) FROM price_paid pp JOIN _xfmt_pairs p ON pp.address_id = p.dup_id) AS price_paid_to_reassign,
-    (SELECT COUNT(*) FROM companies c JOIN _xfmt_pairs p ON c.address_id = p.dup_id) AS companies_to_reassign,
-    (SELECT COUNT(*) FROM food_ratings fr JOIN _xfmt_pairs p ON fr.address_id = p.dup_id) AS food_ratings_to_reassign,
-    (SELECT COUNT(*) FROM voa_ratings vr JOIN _xfmt_pairs p ON vr.address_id = p.dup_id) AS voa_ratings_to_reassign;
+-- Index on pairs for fast FK reassignment and delete
+CREATE INDEX ON _xfmt_pairs (dup_id);
+CREATE INDEX ON _xfmt_pairs (keeper_id);
 
 -- ============================================================================
--- PHASE 4: BACKUP (save all rows that will be deleted)
+-- PHASE 4: EXECUTE — FK reassignment + Delete (all in transaction)
 -- ============================================================================
 \echo ''
-\echo '=== PHASE 4: Creating backup of addresses to be deleted ==='
-
-DROP TABLE IF EXISTS _xfmt_backup;
-
-CREATE TABLE _xfmt_backup AS
-SELECT a.*, p.keeper_id
-FROM addresses a
-JOIN _xfmt_pairs p ON a.id = p.dup_id;
-
-\echo 'Backup created:'
-SELECT COUNT(*) AS backed_up_rows FROM _xfmt_backup;
-\echo ''
-\echo '>>> To RESTORE if needed: INSERT INTO addresses SELECT id,postcode_id,postcode_raw,postcode_norm,house_number,house_name,flat,street,suburb,city,county,location,latitude,longitude,source,source_id,uprn,confidence,is_complete,created_at FROM _xfmt_backup;'
-
--- ============================================================================
--- PHASE 5: EXECUTE — FK reassignment + Delete (all in transaction)
--- ============================================================================
-\echo ''
-\echo '=== PHASE 5: Executing FK reassignment + deletion ==='
+\echo '=== PHASE 4: Executing FK reassignment + deletion ==='
 \echo 'Starting transaction...'
 
 BEGIN;
@@ -217,13 +194,13 @@ WHERE a.id = p.dup_id;
 COMMIT;
 
 \echo ''
-\echo '=== PHASE 5 COMPLETE ==='
+\echo '=== PHASE 4 COMPLETE ==='
 
 -- ============================================================================
--- PHASE 6: VERIFY
+-- PHASE 5: VERIFY
 -- ============================================================================
 \echo ''
-\echo '=== PHASE 6: Verification ==='
+\echo '=== PHASE 5: Verification ==='
 
 \echo 'Total addresses remaining:'
 SELECT COUNT(*) AS total_addresses FROM addresses;
@@ -242,7 +219,7 @@ LIMIT 20;
 \echo ''
 \echo '=== Cleanup ==='
 \echo 'Work tables kept for safety. To clean up later, run:'
-\echo '  DROP TABLE IF EXISTS _xfmt_embedded, _xfmt_pairs, _xfmt_backup;'
+\echo '  DROP TABLE IF EXISTS _xfmt_embedded, _xfmt_pairs;'
 \echo ''
 \echo 'To reclaim disk space, run:'
 \echo '  VACUUM ANALYZE addresses;'
