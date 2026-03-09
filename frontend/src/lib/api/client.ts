@@ -19,7 +19,11 @@ export class ApiError extends Error {
 	}
 }
 
-async function get<T>(path: string, params?: Record<string, string | number>): Promise<T> {
+async function get<T>(
+	path: string,
+	params?: Record<string, string | number>,
+	signal?: AbortSignal
+): Promise<T> {
 	const url = new URL(BASE_URL + path);
 	if (params) {
 		for (const [key, value] of Object.entries(params)) {
@@ -29,7 +33,7 @@ async function get<T>(path: string, params?: Record<string, string | number>): P
 		}
 	}
 
-	const response = await fetch(url.toString());
+	const response = await fetch(url.toString(), { signal });
 
 	if (!response.ok) {
 		const body = await response.json().catch(() => ({ detail: response.statusText }));
@@ -44,23 +48,43 @@ export const api = {
 		return get<HealthResponse>('/health');
 	},
 
-	autocomplete(q: string, limit: number = 8): Promise<PostcodeAutocompleteResponse> {
-		return get<PostcodeAutocompleteResponse>('/postcodes/autocomplete', { q, limit });
+	autocomplete(
+		q: string,
+		limit: number = 8,
+		signal?: AbortSignal
+	): Promise<PostcodeAutocompleteResponse> {
+		return get<PostcodeAutocompleteResponse>('/postcodes/autocomplete', { q, limit }, signal);
 	},
 
-	lookupPostcode(postcode: string, page: number = 1, page_size: number = 20): Promise<PostcodeLookupResponse> {
-		return get<PostcodeLookupResponse>(`/postcodes/${encodeURIComponent(postcode)}`, { page, page_size });
+	lookupPostcode(
+		postcode: string,
+		page: number = 1,
+		page_size: number = 20,
+		signal?: AbortSignal
+	): Promise<PostcodeLookupResponse> {
+		return get<PostcodeLookupResponse>(
+			`/postcodes/${encodeURIComponent(postcode)}`,
+			{ page, page_size },
+			signal
+		);
 	},
 
-	searchAddresses(params: {
-		q?: string;
-		postcode?: string;
-		street?: string;
-		city?: string;
-		page?: number;
-		page_size?: number;
-	}): Promise<AddressListResponse> {
-		return get<AddressListResponse>('/addresses/search', params as Record<string, string | number>);
+	searchAddresses(
+		params: {
+			q?: string;
+			postcode?: string;
+			street?: string;
+			city?: string;
+			page?: number;
+			page_size?: number;
+		},
+		signal?: AbortSignal
+	): Promise<AddressListResponse> {
+		return get<AddressListResponse>(
+			'/addresses/search',
+			params as Record<string, string | number>,
+			signal
+		);
 	},
 
 	getAddress(id: number): Promise<AddressResponse> {

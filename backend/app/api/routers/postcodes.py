@@ -5,7 +5,7 @@ autocomplete for building type-ahead search UIs.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
-from sqlalchemy import func, select
+from sqlalchemy import case, cast, func, Integer, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -212,7 +212,23 @@ async def lookup_postcode(
             selectinload(Address.food_rating_records),
             selectinload(Address.voa_rating_records),
         )
-        .order_by(Address.street, Address.house_number)
+        .order_by(
+            # Group by street name (case-insensitive, strip leading number)
+            func.upper(func.regexp_replace(Address.street, r'^\d+[,\s]*\s*', '', 'g')),
+            # Natural numeric sort: house_number if present, else leading digits from street
+            cast(
+                func.nullif(
+                    func.coalesce(
+                        func.nullif(func.regexp_replace(Address.house_number, '[^0-9]', '', 'g'), ''),
+                        func.nullif(func.substring(Address.street, r'^\d+'), ''),
+                    ),
+                    '',
+                ),
+                Integer,
+            ).asc().nulls_last(),
+            Address.house_number,
+            Address.street,
+        )
         .offset(offset)
         .limit(page_size)
     )

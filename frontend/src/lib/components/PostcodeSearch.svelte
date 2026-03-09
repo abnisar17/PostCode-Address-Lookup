@@ -20,8 +20,10 @@
 	let searching = $state(false);
 	let inputEl: HTMLInputElement | undefined = $state();
 
-	// Debounced autocomplete
+	// Debounced autocomplete with request cancellation
 	let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+	let autocompleteController: AbortController | undefined;
+	let lookupController: AbortController | undefined;
 
 	$effect(() => {
 		const q = query.trim();
@@ -34,12 +36,17 @@
 		}
 
 		debounceTimer = setTimeout(async () => {
+			// Cancel previous autocomplete request
+			autocompleteController?.abort();
+			autocompleteController = new AbortController();
+
 			try {
-				const data = await api.autocomplete(q);
+				const data = await api.autocomplete(q, 8, autocompleteController.signal);
 				suggestions = data.results;
 				showDropdown = suggestions.length > 0;
 				activeIndex = -1;
-			} catch {
+			} catch (err) {
+				if (err instanceof DOMException && err.name === 'AbortError') return;
 				suggestions = [];
 				showDropdown = false;
 			}
@@ -54,11 +61,21 @@
 		searching = true;
 		onloadingchange(true);
 
+		// Cancel previous lookup request
+		lookupController?.abort();
+		lookupController = new AbortController();
+
 		try {
-			const result = await api.lookupPostcode(postcodeNoSpace);
+			const result = await api.lookupPostcode(
+				postcodeNoSpace,
+				1,
+				20,
+				lookupController.signal
+			);
 			query = result.postcode.postcode;
 			onresult(result);
 		} catch (err) {
+			if (err instanceof DOMException && err.name === 'AbortError') return;
 			if (err instanceof ApiError) {
 				onerror(err.detail);
 			} else {

@@ -26,7 +26,9 @@
 		page = 1;
 	}
 
-	// Debounced search
+	// Debounced search with request cancellation
+	let searchController: AbortController | undefined;
+
 	$effect(() => {
 		const q = query.trim();
 		const p = postcode.trim();
@@ -41,17 +43,25 @@
 		}
 
 		const timer = setTimeout(async () => {
+			// Cancel previous search request
+			searchController?.abort();
+			searchController = new AbortController();
+
 			loading = true;
 			error = null;
 			try {
-				results = await api.searchAddresses({
-					q: q || undefined,
-					postcode: p || undefined,
-					street: s || undefined,
-					city: c || undefined,
-					page: currentPage
-				});
+				results = await api.searchAddresses(
+					{
+						q: q || undefined,
+						postcode: p || undefined,
+						street: s || undefined,
+						city: c || undefined,
+						page: currentPage
+					},
+					searchController.signal
+				);
 			} catch (err) {
+				if (err instanceof DOMException && err.name === 'AbortError') return;
 				if (err instanceof ApiError) {
 					error = err.detail;
 				} else {
