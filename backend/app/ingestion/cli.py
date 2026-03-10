@@ -1196,7 +1196,7 @@ def load_new_sources(ctx: typer.Context):
     ctx.invoke(load_dvsa, ctx=ctx, file=None)
 
     console.print("[bold green]All 5 new sources loaded![/bold green]")
-    ctx.invoke(status)
+    ctx.invoke(status, ctx=ctx)
 
 
 # ---------------------------------------------------------------------------
@@ -1824,22 +1824,26 @@ def _upsert_addresses_generic(session: Session, batch: list[BaseModel]) -> int:
     if not values:
         return 0
 
-    stmt = pg_insert(Address).values(values)
-    stmt = stmt.on_conflict_do_update(
-        constraint="uq_addresses_source",
-        set_={
-            "street": stmt.excluded.street,
-            "suburb": stmt.excluded.suburb,
-            "city": stmt.excluded.city,
-            "county": stmt.excluded.county,
-            "postcode_raw": stmt.excluded.postcode_raw,
-            "postcode_norm": stmt.excluded.postcode_norm,
-            "latitude": stmt.excluded.latitude,
-            "longitude": stmt.excluded.longitude,
-        },
-    )
+    # Chunk into sub-batches of 500 to stay within PostgreSQL's parameter limit
+    chunk_size = 500
+    for i in range(0, len(values), chunk_size):
+        chunk = values[i : i + chunk_size]
+        stmt = pg_insert(Address).values(chunk)
+        stmt = stmt.on_conflict_do_update(
+            constraint="uq_addresses_source",
+            set_={
+                "street": stmt.excluded.street,
+                "suburb": stmt.excluded.suburb,
+                "city": stmt.excluded.city,
+                "county": stmt.excluded.county,
+                "postcode_raw": stmt.excluded.postcode_raw,
+                "postcode_norm": stmt.excluded.postcode_norm,
+                "latitude": stmt.excluded.latitude,
+                "longitude": stmt.excluded.longitude,
+            },
+        )
+        session.execute(stmt)
 
-    session.execute(stmt)
     return len(values)
 
 
