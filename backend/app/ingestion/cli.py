@@ -1804,21 +1804,29 @@ def _upsert_addresses_generic(session: Session, batch: list[BaseModel]) -> int:
             values.append({
                 "source": "nhs",
                 "source_id": f"nhs:{r.org_code}",
+                "house_name": r.name,
                 "street": r.address_line_1,
                 "suburb": r.address_line_2,
                 "city": r.city,
+                "county": None,
                 "postcode_raw": r.postcode_raw,
                 "postcode_norm": r.postcode_norm,
+                "latitude": None,
+                "longitude": None,
             })
         elif isinstance(r, DVSARecord):
             values.append({
                 "source": "dvsa",
                 "source_id": f"dvsa:{r.station_number}",
+                "house_name": r.site_name,
                 "street": r.address_line_1,
                 "suburb": r.address_line_2,
                 "city": r.town,
+                "county": None,
                 "postcode_raw": r.postcode_raw,
                 "postcode_norm": r.postcode_norm,
+                "latitude": None,
+                "longitude": None,
             })
 
     if not values:
