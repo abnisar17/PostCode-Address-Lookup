@@ -1189,11 +1189,11 @@ def load_new_sources(ctx: typer.Context):
     """
     console.print("[bold blue]Loading 5 new data sources only...[/bold blue]")
 
-    ctx.invoke(load_cqc)
-    ctx.invoke(load_charity)
-    ctx.invoke(load_schools)
-    ctx.invoke(load_nhs)
-    ctx.invoke(load_dvsa)
+    ctx.invoke(load_cqc, ctx=ctx)
+    ctx.invoke(load_charity, ctx=ctx)
+    ctx.invoke(load_schools, ctx=ctx)
+    ctx.invoke(load_nhs, ctx=ctx)
+    ctx.invoke(load_dvsa, ctx=ctx)
 
     console.print("[bold green]All 5 new sources loaded![/bold green]")
     ctx.invoke(status)
