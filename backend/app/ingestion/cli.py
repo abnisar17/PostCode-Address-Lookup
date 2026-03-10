@@ -692,6 +692,141 @@ def load_epc(
 
 
 # ---------------------------------------------------------------------------
+# load-cqc
+# ---------------------------------------------------------------------------
+@app.command()
+def load_cqc(
+    ctx: typer.Context,
+    file: str = typer.Option(None, "--file", "-f", help="Path to CQC CSV file"),
+):
+    """Load addresses from CQC Care Directory CSV."""
+    from app.ingestion.cqc import parse_cqc
+
+    state = _get_state(ctx)
+    log = get_logger("load-cqc")
+    cfg = state.config
+    csv_path = Path(file) if file else cfg.cqc_file
+
+    console.print("[bold]Loading CQC care locations...[/bold]")
+    result = batch_load(
+        state.session_factory,
+        parse_cqc(csv_path, batch_size=cfg.batch_size),
+        _upsert_addresses_generic,
+        source="cqc",
+        label="CQC addresses",
+    )
+    console.print(f"[green]CQC loaded:[/green] {result.loaded} addresses")
+
+
+# ---------------------------------------------------------------------------
+# load-charity
+# ---------------------------------------------------------------------------
+@app.command()
+def load_charity(
+    ctx: typer.Context,
+    file: str = typer.Option(None, "--file", "-f", help="Path to Charity CSV/ZIP file"),
+):
+    """Load addresses from Charity Commission register."""
+    from app.ingestion.charity import parse_charity
+
+    state = _get_state(ctx)
+    log = get_logger("load-charity")
+    cfg = state.config
+    file_path = Path(file) if file else cfg.charity_file
+
+    console.print("[bold]Loading Charity Commission addresses...[/bold]")
+    result = batch_load(
+        state.session_factory,
+        parse_charity(file_path, batch_size=cfg.batch_size),
+        _upsert_addresses_generic,
+        source="charity",
+        label="Charity addresses",
+    )
+    console.print(f"[green]Charity loaded:[/green] {result.loaded} addresses")
+
+
+# ---------------------------------------------------------------------------
+# load-schools
+# ---------------------------------------------------------------------------
+@app.command()
+def load_schools(
+    ctx: typer.Context,
+    file: str = typer.Option(None, "--file", "-f", help="Path to GIAS schools CSV"),
+):
+    """Load addresses from GIAS (Get Information About Schools) CSV."""
+    from app.ingestion.schools import parse_schools
+
+    state = _get_state(ctx)
+    log = get_logger("load-schools")
+    cfg = state.config
+    csv_path = Path(file) if file else cfg.schools_file
+
+    console.print("[bold]Loading school addresses...[/bold]")
+    result = batch_load(
+        state.session_factory,
+        parse_schools(csv_path, batch_size=cfg.batch_size),
+        _upsert_addresses_generic,
+        source="schools",
+        label="School addresses",
+    )
+    console.print(f"[green]Schools loaded:[/green] {result.loaded} addresses")
+
+
+# ---------------------------------------------------------------------------
+# load-nhs
+# ---------------------------------------------------------------------------
+@app.command()
+def load_nhs(
+    ctx: typer.Context,
+    file: str = typer.Option(None, "--file", "-f", help="Path to NHS ODS CSV"),
+):
+    """Load addresses from NHS Organisation Data Service CSV."""
+    from app.ingestion.nhs import parse_nhs
+
+    state = _get_state(ctx)
+    log = get_logger("load-nhs")
+    cfg = state.config
+    csv_path = Path(file) if file else cfg.nhs_file
+
+    console.print("[bold]Loading NHS organisation addresses...[/bold]")
+    result = batch_load(
+        state.session_factory,
+        parse_nhs(csv_path, batch_size=cfg.batch_size),
+        _upsert_addresses_generic,
+        source="nhs",
+        label="NHS addresses",
+    )
+    console.print(f"[green]NHS loaded:[/green] {result.loaded} addresses")
+
+
+# ---------------------------------------------------------------------------
+# load-dvsa
+# ---------------------------------------------------------------------------
+@app.command()
+def load_dvsa(
+    ctx: typer.Context,
+    file: str = typer.Option(None, "--file", "-f", help="Path to DVSA MOT stations CSV"),
+):
+    """Load addresses from DVSA Active MOT Test Stations CSV."""
+    from app.ingestion.dvsa import parse_dvsa
+
+    state = _get_state(ctx)
+    log = get_logger("load-dvsa")
+    cfg = state.config
+    csv_path = Path(file) if file else cfg.dvsa_file
+
+    console.print("[bold]Loading DVSA MOT station addresses...[/bold]")
+    result = batch_load(
+        state.session_factory,
+        parse_dvsa(csv_path, batch_size=cfg.batch_size),
+        _upsert_addresses_generic,
+        source="dvsa",
+        label="DVSA addresses",
+    )
+    console.print(f"[green]DVSA loaded:[/green] {result.loaded} addresses")
+
+
+# ---------------------------------------------------------------------------
 # load-voa
 # ---------------------------------------------------------------------------
 @app.command()
@@ -1039,6 +1174,29 @@ def run_all(
     ctx.invoke(status)
 
     console.print("[bold green]Pipeline complete![/bold green]")
+
+
+# ---------------------------------------------------------------------------
+# load-new-sources — only the 5 new sources (does NOT touch existing 31M)
+# ---------------------------------------------------------------------------
+@app.command(name="load-new-sources")
+def load_new_sources(ctx: typer.Context):
+    """Load ONLY the 5 new data sources (CQC, Charity, Schools, NHS, DVSA).
+
+    This does NOT re-run existing sources (OSM, Land Registry, Companies House,
+    FSA, VOA, EPC, UPRN, postcodes). Safe to run on a live database — uses
+    ON CONFLICT DO UPDATE so it's idempotent.
+    """
+    console.print("[bold blue]Loading 5 new data sources only...[/bold blue]")
+
+    ctx.invoke(load_cqc)
+    ctx.invoke(load_charity)
+    ctx.invoke(load_schools)
+    ctx.invoke(load_nhs)
+    ctx.invoke(load_dvsa)
+
+    console.print("[bold green]All 5 new sources loaded![/bold green]")
+    ctx.invoke(status)
 
 
 # ---------------------------------------------------------------------------
@@ -1588,6 +1746,101 @@ def _upsert_voa_ratings(session: Session, batch: list[BaseModel]) -> int:
 
     session.execute(stmt)
     return len(records)
+
+
+def _upsert_addresses_generic(session: Session, batch: list[BaseModel]) -> int:
+    """Generic upsert for new data sources (CQC, Charity, Schools, NHS, DVSA).
+
+    Extracts source, source_id, and address fields from various record types.
+    ON CONFLICT (source, source_id) DO UPDATE.
+    """
+    from app.ingestion.schemas import (
+        CharityRecord, CQCRecord, DVSARecord, NHSRecord, SchoolRecord,
+    )
+
+    if not batch:
+        return 0
+
+    values = []
+    for r in batch:
+        if isinstance(r, CQCRecord):
+            values.append({
+                "source": "cqc",
+                "source_id": f"cqc:{r.location_id}",
+                "street": r.address_line_1,
+                "suburb": r.address_line_2,
+                "city": r.city,
+                "county": r.county,
+                "postcode_raw": r.postcode_raw,
+                "postcode_norm": r.postcode_norm,
+                "latitude": r.latitude,
+                "longitude": r.longitude,
+            })
+        elif isinstance(r, CharityRecord):
+            values.append({
+                "source": "charity",
+                "source_id": f"charity:{r.charity_number}",
+                "street": r.address_line_1,
+                "suburb": r.address_line_2,
+                "city": r.city,
+                "county": r.county,
+                "postcode_raw": r.postcode_raw,
+                "postcode_norm": r.postcode_norm,
+            })
+        elif isinstance(r, SchoolRecord):
+            values.append({
+                "source": "schools",
+                "source_id": f"school:{r.urn}",
+                "street": r.street,
+                "suburb": r.locality,
+                "city": r.town,
+                "county": r.county,
+                "postcode_raw": r.postcode_raw,
+                "postcode_norm": r.postcode_norm,
+                "latitude": r.latitude,
+                "longitude": r.longitude,
+            })
+        elif isinstance(r, NHSRecord):
+            values.append({
+                "source": "nhs",
+                "source_id": f"nhs:{r.org_code}",
+                "street": r.address_line_1,
+                "suburb": r.address_line_2,
+                "city": r.city,
+                "postcode_raw": r.postcode_raw,
+                "postcode_norm": r.postcode_norm,
+            })
+        elif isinstance(r, DVSARecord):
+            values.append({
+                "source": "dvsa",
+                "source_id": f"dvsa:{r.station_number}",
+                "street": r.address_line_1,
+                "suburb": r.address_line_2,
+                "city": r.town,
+                "postcode_raw": r.postcode_raw,
+                "postcode_norm": r.postcode_norm,
+            })
+
+    if not values:
+        return 0
+
+    stmt = pg_insert(Address).values(values)
+    stmt = stmt.on_conflict_do_update(
+        constraint="uq_addresses_source",
+        set_={
+            "street": stmt.excluded.street,
+            "suburb": stmt.excluded.suburb,
+            "city": stmt.excluded.city,
+            "county": stmt.excluded.county,
+            "postcode_raw": stmt.excluded.postcode_raw,
+            "postcode_norm": stmt.excluded.postcode_norm,
+            "latitude": stmt.excluded.latitude,
+            "longitude": stmt.excluded.longitude,
+        },
+    )
+
+    session.execute(stmt)
+    return len(values)
 
 
 # ---------------------------------------------------------------------------

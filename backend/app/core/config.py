@@ -60,6 +60,34 @@ class Settings(BaseSettings):
         "uk-englandwales-ndr-2023-listentries-compiled-epoch-0019-baseline-csv.zip"
     )
 
+    # ── New additional data source URLs ────────────────────────────
+
+    # CQC Care Directory (CSV download)
+    cqc_download_url: str = (
+        "https://www.cqc.org.uk/about-us/transparency/using-cqc-data"
+    )
+
+    # Charity Commission (ZIP/CSV download)
+    charity_download_url: str = (
+        "https://ccewuksprdoneregsadata1.blob.core.windows.net/data/json/publicextract.charity.zip"
+    )
+
+    # GIAS Schools (CSV download)
+    schools_download_url: str = (
+        "https://get-information-schools.service.gov.uk/"
+    )
+
+    # NHS ODS (CSV download)
+    nhs_download_url: str = (
+        "https://digital.nhs.uk/services/organisation-data-service/"
+        "data-search-and-export/csv-downloads"
+    )
+
+    # DVSA MOT Stations (CSV download)
+    dvsa_download_url: str = (
+        "https://www.gov.uk/government/publications/active-mot-test-stations"
+    )
+
     # Ingestion tuning
     batch_size: int = 10_000
     osm_index_type: str = "sparse_file_array"
@@ -105,3 +133,23 @@ class Settings(BaseSettings):
     @property
     def epc_dir(self) -> Path:
         return self.data_dir / "epc"
+
+    @property
+    def cqc_file(self) -> Path:
+        return self.data_dir / "cqc-care-directory.csv"
+
+    @property
+    def charity_file(self) -> Path:
+        return self.data_dir / "charity-register.zip"
+
+    @property
+    def schools_file(self) -> Path:
+        return self.data_dir / "gias-schools.csv"
+
+    @property
+    def nhs_file(self) -> Path:
+        return self.data_dir / "nhs-organisations.csv"
+
+    @property
+    def dvsa_file(self) -> Path:
+        return self.data_dir / "dvsa-mot-stations.csv"

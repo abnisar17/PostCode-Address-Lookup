@@ -255,3 +255,128 @@ class VOARecord(BaseModel):
     _trunc_sub3 = field_validator("sub_street_3", mode="before")(_truncate(100))
     _trunc_sub2 = field_validator("sub_street_2", mode="before")(_truncate(100))
     _trunc_sub1 = field_validator("sub_street_1", mode="before")(_truncate(100))
+
+
+# ── CQC Care Quality Commission ──────────────────────────────────
+
+
+class CQCRecord(BaseModel):
+    """Validated record from CQC Care Directory CSV."""
+
+    location_id: str
+    location_name: str | None = None
+    care_home: str | None = None
+    location_type: str | None = None
+    postcode_raw: str | None = None
+    postcode_norm: str | None = None
+    address_line_1: str | None = None
+    address_line_2: str | None = None
+    city: str | None = None
+    county: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+
+    _trunc_name = field_validator("location_name", mode="before")(_truncate(300))
+    _trunc_addr1 = field_validator("address_line_1", mode="before")(_truncate(200))
+    _trunc_addr2 = field_validator("address_line_2", mode="before")(_truncate(200))
+    _trunc_city = field_validator("city", mode="before")(_truncate(100))
+    _trunc_county = field_validator("county", mode="before")(_truncate(100))
+
+
+# ── Charity Commission ───────────────────────────────────────────
+
+
+class CharityRecord(BaseModel):
+    """Validated record from Charity Commission register CSV."""
+
+    charity_number: str
+    charity_name: str | None = None
+    charity_status: str | None = None
+    postcode_raw: str | None = None
+    postcode_norm: str | None = None
+    address_line_1: str | None = None
+    address_line_2: str | None = None
+    address_line_3: str | None = None
+    city: str | None = None
+    county: str | None = None
+
+    _trunc_name = field_validator("charity_name", mode="before")(_truncate(300))
+    _trunc_addr1 = field_validator("address_line_1", mode="before")(_truncate(200))
+    _trunc_addr2 = field_validator("address_line_2", mode="before")(_truncate(200))
+    _trunc_addr3 = field_validator("address_line_3", mode="before")(_truncate(200))
+    _trunc_city = field_validator("city", mode="before")(_truncate(100))
+    _trunc_county = field_validator("county", mode="before")(_truncate(100))
+
+
+# ── GIAS Schools ─────────────────────────────────────────────────
+
+
+class SchoolRecord(BaseModel):
+    """Validated record from GIAS schools CSV."""
+
+    urn: int
+    name: str | None = None
+    establishment_type: str | None = None
+    status: str | None = None
+    postcode_raw: str | None = None
+    postcode_norm: str | None = None
+    street: str | None = None
+    locality: str | None = None
+    town: str | None = None
+    county: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+
+    _trunc_name = field_validator("name", mode="before")(_truncate(300))
+    _trunc_street = field_validator("street", mode="before")(_truncate(200))
+    _trunc_locality = field_validator("locality", mode="before")(_truncate(100))
+    _trunc_town = field_validator("town", mode="before")(_truncate(100))
+    _trunc_county = field_validator("county", mode="before")(_truncate(100))
+
+
+# ── NHS Organisation Data ────────────────────────────────────────
+
+
+class NHSRecord(BaseModel):
+    """Validated record from NHS ODS CSV."""
+
+    org_code: str
+    name: str | None = None
+    org_type: str | None = None
+    status: str | None = None
+    postcode_raw: str | None = None
+    postcode_norm: str | None = None
+    address_line_1: str | None = None
+    address_line_2: str | None = None
+    address_line_3: str | None = None
+    address_line_4: str | None = None
+    city: str | None = None
+
+    _trunc_name = field_validator("name", mode="before")(_truncate(300))
+    _trunc_addr1 = field_validator("address_line_1", mode="before")(_truncate(200))
+    _trunc_addr2 = field_validator("address_line_2", mode="before")(_truncate(200))
+    _trunc_addr3 = field_validator("address_line_3", mode="before")(_truncate(200))
+    _trunc_addr4 = field_validator("address_line_4", mode="before")(_truncate(200))
+    _trunc_city = field_validator("city", mode="before")(_truncate(100))
+
+
+# ── DVSA MOT Test Stations ───────────────────────────────────────
+
+
+class DVSARecord(BaseModel):
+    """Validated record from DVSA Active MOT Test Stations CSV."""
+
+    station_number: str
+    site_name: str | None = None
+    postcode_raw: str | None = None
+    postcode_norm: str | None = None
+    address_line_1: str | None = None
+    address_line_2: str | None = None
+    address_line_3: str | None = None
+    town: str | None = None
+
+    _trunc_name = field_validator("site_name", mode="before")(_truncate(300))
+    _trunc_addr1 = field_validator("address_line_1", mode="before")(_truncate(200))
+    _trunc_addr2 = field_validator("address_line_2", mode="before")(_truncate(200))
+    _trunc_addr3 = field_validator("address_line_3", mode="before")(_truncate(200))
+    _trunc_town = field_validator("town", mode="before")(_truncate(100))
