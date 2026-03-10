@@ -1824,8 +1824,9 @@ def _upsert_addresses_generic(session: Session, batch: list[BaseModel]) -> int:
     if not values:
         return 0
 
-    # Chunk into sub-batches of 500 to stay within PostgreSQL's parameter limit
-    chunk_size = 500
+    # Chunk into sub-batches of 200 to stay within PostgreSQL's parameter limit
+    # (Address model has ~20 columns, so 200 × 20 = 4000 params, well under 32767)
+    chunk_size = 200
     for i in range(0, len(values), chunk_size):
         chunk = values[i : i + chunk_size]
         stmt = pg_insert(Address).values(chunk)
