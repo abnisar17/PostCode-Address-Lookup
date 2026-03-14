@@ -129,7 +129,8 @@ async def search_addresses(
         )
 
     # Build WHERE conditions once, reuse for both count and data queries
-    conditions = []
+    # Always exclude soft-marked duplicates
+    conditions = [Address.duplicate_of.is_(None)]
 
     # General text search across multiple fields
     if q:

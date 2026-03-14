@@ -141,6 +141,11 @@ class Address(Base):
     confidence: Mapped[float | None] = mapped_column(Float, default=0.0)
     is_complete: Mapped[bool] = mapped_column(Boolean, default=False)
 
+    # Dedup: soft-mark duplicates (NULL = not a duplicate, else points to keeper address)
+    duplicate_of: Mapped[int | None] = mapped_column(
+        ForeignKey("addresses.id"), index=False
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

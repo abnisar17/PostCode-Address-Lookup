@@ -192,10 +192,12 @@ async def lookup_postcode(
             detail=f"Postcode '{normalised}' not found",
         )
 
-    # Total address count for this postcode
+    # Total address count for this postcode (exclude duplicates)
     total = (
         await db.scalar(
-            select(func.count(Address.id)).where(Address.postcode_id == postcode_row.id)
+            select(func.count(Address.id))
+            .where(Address.postcode_id == postcode_row.id)
+            .where(Address.duplicate_of.is_(None))
         )
         or 0
     )
@@ -206,6 +208,7 @@ async def lookup_postcode(
     addr_stmt = (
         select(Address)
         .where(Address.postcode_id == postcode_row.id)
+        .where(Address.duplicate_of.is_(None))
         .options(
             selectinload(Address.price_paid_records),
             selectinload(Address.company_records),
