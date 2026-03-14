@@ -16,6 +16,11 @@
 -- ============================================================================
 -- PHASE 1: Helper functions
 -- ============================================================================
+\echo '=== PHASE 0: Reset previous (broken) dedup marks ==='
+UPDATE addresses SET duplicate_of = NULL WHERE duplicate_of IS NOT NULL;
+\echo 'Previous marks cleared'
+
+\echo ''
 \echo '=== PHASE 1: Creating helper functions ==='
 
 -- Extract leading number from street field (e.g. "5, St. Leonards Road" → "5")
@@ -51,30 +56,31 @@ BEGIN
     result := regexp_replace(result, ',\s*$', '');
 
     -- Normalize "STREET" before another word → "SAINT" (Street Leonards → SAINT LEONARDS)
-    result := regexp_replace(result, '\bSTREET\s+(?=[A-Z])', 'SAINT ', 'g');
+    -- Note: PostgreSQL uses \m (start of word) and \M (end of word), NOT \b
+    result := regexp_replace(result, '\mSTREET\s+(?=[A-Z])', 'SAINT ', 'g');
 
     -- Normalize "ST" before another word → "SAINT" (St James → SAINT JAMES)
-    result := regexp_replace(result, '\bST\s+(?=[A-Z])', 'SAINT ', 'g');
+    result := regexp_replace(result, '\mST\s+(?=[A-Z])', 'SAINT ', 'g');
 
     -- Normalize trailing abbreviations to full form
-    result := regexp_replace(result, '\bST$', 'STREET');
-    result := regexp_replace(result, '\bRD$', 'ROAD');
-    result := regexp_replace(result, '\bAVE$', 'AVENUE');
-    result := regexp_replace(result, '\bAV$', 'AVENUE');
-    result := regexp_replace(result, '\bCRES$', 'CRESCENT');
-    result := regexp_replace(result, '\bCR$', 'CRESCENT');
-    result := regexp_replace(result, '\bDR$', 'DRIVE');
-    result := regexp_replace(result, '\bDRV$', 'DRIVE');
-    result := regexp_replace(result, '\bLN$', 'LANE');
-    result := regexp_replace(result, '\bCT$', 'COURT');
-    result := regexp_replace(result, '\bCL$', 'CLOSE');
-    result := regexp_replace(result, '\bPL$', 'PLACE');
-    result := regexp_replace(result, '\bSQ$', 'SQUARE');
-    result := regexp_replace(result, '\bTERR$', 'TERRACE');
-    result := regexp_replace(result, '\bGDNS$', 'GARDENS');
-    result := regexp_replace(result, '\bGRV$', 'GROVE');
-    result := regexp_replace(result, '\bPK$', 'PARK');
-    result := regexp_replace(result, '\bMWS$', 'MEWS');
+    result := regexp_replace(result, '\mST$', 'STREET');
+    result := regexp_replace(result, '\mRD$', 'ROAD');
+    result := regexp_replace(result, '\mAVE$', 'AVENUE');
+    result := regexp_replace(result, '\mAV$', 'AVENUE');
+    result := regexp_replace(result, '\mCRES$', 'CRESCENT');
+    result := regexp_replace(result, '\mCR$', 'CRESCENT');
+    result := regexp_replace(result, '\mDR$', 'DRIVE');
+    result := regexp_replace(result, '\mDRV$', 'DRIVE');
+    result := regexp_replace(result, '\mLN$', 'LANE');
+    result := regexp_replace(result, '\mCT$', 'COURT');
+    result := regexp_replace(result, '\mCL$', 'CLOSE');
+    result := regexp_replace(result, '\mPL$', 'PLACE');
+    result := regexp_replace(result, '\mSQ$', 'SQUARE');
+    result := regexp_replace(result, '\mTERR$', 'TERRACE');
+    result := regexp_replace(result, '\mGDNS$', 'GARDENS');
+    result := regexp_replace(result, '\mGRV$', 'GROVE');
+    result := regexp_replace(result, '\mPK$', 'PARK');
+    result := regexp_replace(result, '\mMWS$', 'MEWS');
 
     -- Collapse multiple spaces
     result := regexp_replace(result, '\s+', ' ', 'g');
