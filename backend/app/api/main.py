@@ -7,7 +7,7 @@ the ASGI entry point used by uvicorn.
 
 from contextlib import asynccontextmanager
 
-from fastapi import APIRouter, FastAPI
+from fastapi import APIRouter, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.deps import dispose_engine
@@ -81,6 +81,14 @@ def create_app() -> FastAPI:
         allow_methods=["GET"],
         allow_headers=["*"],
     )
+
+    # Disable browser caching for API responses
+    @application.middleware("http")
+    async def no_cache_headers(request: Request, call_next):
+        response: Response = await call_next(request)
+        if request.url.path.startswith("/api/"):
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        return response
 
     # Exception handlers
     register_exception_handlers(application)
