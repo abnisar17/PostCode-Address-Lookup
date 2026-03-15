@@ -216,8 +216,21 @@ async def lookup_postcode(
             selectinload(Address.voa_rating_records),
         )
         .order_by(
-            # Group by street name (case-insensitive, strip leading number)
-            func.upper(func.regexp_replace(Address.street, r'^\d+[,\s]*\s*', '', 'g')),
+            # Group by normalized street name: strip leading number, remove dots,
+            # normalize St/Street before names → SAINT (so "St. Leonards" and
+            # "Street Leonards" sort together)
+            text(r"""
+                regexp_replace(
+                    regexp_replace(
+                        UPPER(REPLACE(
+                            regexp_replace(street, '^\d+[a-zA-Z]?\s*[,\s]+\s*', '', 'g'),
+                            '.', ''
+                        )),
+                        '\mSTREET\s+(?=[A-Z])', 'SAINT ', 'g'
+                    ),
+                    '\mST\s+(?=[A-Z])', 'SAINT ', 'g'
+                )
+            """),
             # Natural numeric sort: house_number if present, else leading digits from street
             cast(
                 func.nullif(
