@@ -23,4 +23,4 @@ services:
       - ./frontend/svelte.config.js:/app/svelte.config.js
       - ./frontend/tsconfig.json:/app/tsconfig.json
     environment:
-      VITE_API_BASE_URL: ""
+      VITE_API_BASE_URL: http://localhost:8000
