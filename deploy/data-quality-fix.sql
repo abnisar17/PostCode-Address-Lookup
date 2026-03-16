@@ -159,7 +159,7 @@ WHERE (house_number IS NULL OR TRIM(house_number) = '')
   AND street ~ '^\s*\d+[A-Za-z]?\s*[,\s]'
   AND TRIM(regexp_replace(TRIM(street), '^\s*\d+[A-Za-z]?\s*[,\s]+\s*', '')) != ''
 ON CONFLICT (address_id) DO UPDATE SET
-  fix_applied = _dq_backup.fix_applied || 'hnum_extract';
+  fix_applied = _dq_backup.fix_applied || ARRAY['hnum_extract'];
 
 \echo 'Rows backed up for Fix 1:'
 SELECT COUNT(*) AS backed_up FROM _dq_backup WHERE 'hnum_extract' = ANY(fix_applied);
@@ -188,7 +188,7 @@ WHERE street IS NOT NULL
   AND TRIM(street) != ''
   AND _canonical_street(street) != street
 ON CONFLICT (address_id) DO UPDATE SET
-  fix_applied = _dq_backup.fix_applied || 'street_norm';
+  fix_applied = _dq_backup.fix_applied || ARRAY['street_norm'];
 
 \echo 'Rows backed up for Fix 2:'
 SELECT COUNT(*) AS backed_up FROM _dq_backup WHERE 'street_norm' = ANY(fix_applied);
@@ -220,7 +220,7 @@ WHERE suburb IS NOT NULL
   AND city IS NOT NULL
   AND UPPER(TRIM(suburb)) = UPPER(TRIM(city))
 ON CONFLICT (address_id) DO UPDATE SET
-  fix_applied = _dq_backup.fix_applied || 'suburb_clear';
+  fix_applied = _dq_backup.fix_applied || ARRAY['suburb_clear'];
 
 \echo 'Rows backed up for Fix 3:'
 SELECT COUNT(*) AS backed_up FROM _dq_backup WHERE 'suburb_clear' = ANY(fix_applied);
