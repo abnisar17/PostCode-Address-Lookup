@@ -15,7 +15,7 @@
 		<button
 			role="tab"
 			aria-selected={tab.id === active}
-			class="px-4 py-2.5 text-sm font-medium transition-colors {tab.id === active
+			class="flex-1 px-3 py-2.5 text-center text-sm font-medium transition-colors sm:flex-none sm:px-4 sm:text-left {tab.id === active
 				? 'border-b-2 border-blue-500 text-blue-600'
 				: 'text-gray-500 hover:text-gray-700'}"
 			onclick={() => onchange(tab.id)}

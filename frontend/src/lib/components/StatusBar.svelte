@@ -18,24 +18,24 @@
 	});
 </script>
 
-<footer class="fixed bottom-0 left-0 right-0 border-t border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-500">
-	<div class="mx-auto flex max-w-3xl items-center justify-between">
+<footer class="fixed bottom-0 left-0 right-0 border-t border-gray-200 bg-gray-50 px-3 py-1.5 text-xs text-gray-500 sm:px-4 sm:py-2 sm:text-sm">
+	<div class="mx-auto flex max-w-3xl flex-col items-center gap-0.5 sm:flex-row sm:justify-between sm:gap-0">
 		{#if health}
 			<div class="flex items-center gap-2">
 				<span class="inline-block h-2 w-2 rounded-full bg-green-500"></span>
 				<span>API connected</span>
 			</div>
-			<div class="flex flex-wrap gap-4">
+			<div class="flex flex-wrap justify-center gap-x-3 gap-y-0.5 sm:gap-4">
 				<span>{health.postcode_count.toLocaleString()} postcodes</span>
 				<span>{health.address_count.toLocaleString()} addresses</span>
 				{#if health.price_paid_count > 0}
-					<span>{health.price_paid_count.toLocaleString()} price records</span>
+					<span class="hidden sm:inline">{health.price_paid_count.toLocaleString()} price records</span>
 				{/if}
 				{#if health.company_count > 0}
-					<span>{health.company_count.toLocaleString()} companies</span>
+					<span class="hidden sm:inline">{health.company_count.toLocaleString()} companies</span>
 				{/if}
 				{#if health.food_rating_count > 0}
-					<span>{health.food_rating_count.toLocaleString()} food ratings</span>
+					<span class="hidden sm:inline">{health.food_rating_count.toLocaleString()} food ratings</span>
 				{/if}
 			</div>
 		{:else if error}

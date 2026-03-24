@@ -160,7 +160,7 @@
 	{#if showDropdown}
 		<ul
 			id="postcode-suggestions"
-			class="absolute z-10 mt-1 w-full overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg"
+			class="absolute z-10 mt-1 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg max-h-60"
 			role="listbox"
 		>
 			{#each suggestions as suggestion, i (suggestion.postcode_no_space)}

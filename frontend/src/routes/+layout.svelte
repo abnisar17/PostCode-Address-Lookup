@@ -6,13 +6,13 @@
 </script>
 
 <div class="flex min-h-screen flex-col bg-gray-50">
-	<header class="border-b border-gray-200 bg-white px-4 py-4 shadow-sm">
+	<header class="border-b border-gray-200 bg-white px-3 py-3 shadow-sm sm:px-4 sm:py-4">
 		<div class="mx-auto max-w-3xl">
-			<h1 class="text-xl font-semibold text-gray-900">UK Postcode & Address Lookup</h1>
+			<h1 class="text-lg font-semibold text-gray-900 sm:text-xl">UK Postcode & Address Lookup</h1>
 		</div>
 	</header>
 
-	<main class="mx-auto w-full max-w-3xl flex-1 px-4 py-6 pb-24">
+	<main class="mx-auto w-full max-w-3xl flex-1 px-3 py-4 pb-20 sm:px-4 sm:py-6 sm:pb-24">
 		{@render children()}
 	</main>
 

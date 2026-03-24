@@ -108,21 +108,21 @@
 					oninput={resetPage}
 					type="text"
 					placeholder="Postcode"
-					class="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+					class="w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
 				/>
 				<input
 					bind:value={street}
 					oninput={resetPage}
 					type="text"
 					placeholder="Street"
-					class="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+					class="w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
 				/>
 				<input
 					bind:value={city}
 					oninput={resetPage}
 					type="text"
 					placeholder="City"
-					class="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+					class="w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
 				/>
 			</div>
 		{/if}

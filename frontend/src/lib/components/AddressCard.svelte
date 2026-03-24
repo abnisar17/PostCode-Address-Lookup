@@ -145,9 +145,9 @@
 	}
 </script>
 
-<div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-	<p class="text-gray-900">{formatted || 'No address details'}</p>
-	<div class="mt-2 flex flex-wrap items-center gap-3 text-xs text-gray-500">
+<div class="rounded-lg border border-gray-200 bg-white p-3 shadow-sm sm:p-4">
+	<p class="text-sm text-gray-900 sm:text-base">{formatted || 'No address details'}</p>
+	<div class="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-500 sm:gap-3">
 		{#if sourceLabel}
 			<span class="rounded-full bg-indigo-100 px-2 py-0.5 text-indigo-700">{sourceLabel}</span>
 		{/if}
@@ -214,7 +214,7 @@
 					<div class="border-t border-gray-100 px-3 py-2">
 						<ul class="space-y-1.5">
 							{#each sortedPricePaid as txn (txn.id)}
-								<li class="flex items-baseline justify-between text-sm">
+								<li class="flex flex-col gap-0.5 text-sm sm:flex-row sm:items-baseline sm:justify-between">
 									<div class="flex items-baseline gap-2">
 										<span class="font-semibold text-gray-900"
 											>{formatPrice(txn.price)}</span
@@ -270,7 +270,7 @@
 						<ul class="space-y-1.5">
 							{#each enrichedAddress.companies ?? [] as company (company.id)}
 								<li class="text-sm">
-									<div class="flex items-baseline justify-between">
+									<div class="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between">
 										<span class="font-medium text-gray-900"
 											>{company.company_name ?? company.company_number}</span
 										>
@@ -328,7 +328,7 @@
 						<ul class="space-y-2">
 							{#each enrichedAddress.food_ratings ?? [] as rating (rating.id)}
 								<li class="text-sm">
-									<div class="flex items-center justify-between">
+									<div class="flex flex-col gap-0.5 sm:flex-row sm:items-center sm:justify-between">
 										<span class="font-medium text-gray-900"
 											>{rating.business_name ?? 'Unknown business'}</span
 										>

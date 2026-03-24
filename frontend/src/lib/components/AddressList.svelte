@@ -24,8 +24,8 @@
 </script>
 
 <div class="space-y-4">
-	<div class="rounded-lg border border-blue-200 bg-blue-50 p-4">
-		<div class="flex items-baseline justify-between">
+	<div class="rounded-lg border border-blue-200 bg-blue-50 p-3 sm:p-4">
+		<div class="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
 			<h2 class="text-lg font-semibold text-blue-900">{postcode.postcode}</h2>
 			<span class="text-sm text-blue-700">{count} {count === 1 ? 'address' : 'addresses'}</span>
 		</div>
@@ -56,9 +56,9 @@
 		</div>
 
 		{#if totalPages > 1 && onpagechange}
-			<div class="flex items-center justify-between border-t border-gray-200 pt-4">
+			<div class="flex flex-col items-center gap-3 border-t border-gray-200 pt-4 sm:flex-row sm:justify-between">
 				<button
-					class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+					class="w-full rounded-md border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
 					disabled={page <= 1}
 					onclick={() => onpagechange(page - 1)}
 				>
@@ -68,7 +68,7 @@
 					Page {page} of {totalPages}
 				</span>
 				<button
-					class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+					class="w-full rounded-md border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
 					disabled={page >= totalPages}
 					onclick={() => onpagechange(page + 1)}
 				>

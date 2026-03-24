@@ -35,21 +35,21 @@
 	});
 </script>
 
-<nav aria-label="Pagination" class="flex items-center justify-center gap-1">
+<nav aria-label="Pagination" class="flex flex-wrap items-center justify-center gap-1 sm:gap-1.5">
 	<button
-		class="rounded-md px-3 py-1.5 text-sm text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+		class="rounded-md px-3 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
 		disabled={currentPage <= 1}
 		onclick={() => onpagechange(currentPage - 1)}
 	>
-		Previous
+		Prev
 	</button>
 
 	{#each pages as page, i (page != null ? page : `ellipsis-${i}`)}
 		{#if page === null}
-			<span class="px-2 text-gray-400">...</span>
+			<span class="px-1 text-gray-400 sm:px-2">...</span>
 		{:else}
 			<button
-				class="min-w-[2rem] rounded-md px-2 py-1.5 text-sm transition-colors {page === currentPage
+				class="min-w-[2.25rem] rounded-md px-2 py-2 text-sm transition-colors {page === currentPage
 					? 'bg-blue-500 font-medium text-white'
 					: 'text-gray-600 hover:bg-gray-100'}"
 				aria-current={page === currentPage ? 'page' : undefined}
@@ -61,7 +61,7 @@
 	{/each}
 
 	<button
-		class="rounded-md px-3 py-1.5 text-sm text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+		class="rounded-md px-3 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
 		disabled={currentPage >= totalPages}
 		onclick={() => onpagechange(currentPage + 1)}
 	>
