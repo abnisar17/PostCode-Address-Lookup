@@ -232,16 +232,20 @@ async def lookup_postcode(
                 )
             """),
             # Natural numeric sort: house_number if present, else leading digits from street
-            cast(
-                func.nullif(
-                    func.coalesce(
-                        func.nullif(func.regexp_replace(Address.house_number, '[^0-9]', '', 'g'), ''),
-                        func.nullif(func.substring(Address.street, r'^\d+'), ''),
-                    ),
-                    '',
-                ),
-                Integer,
-            ).asc().nulls_last(),
+            # Use text() with length guard to avoid integer overflow on large numbers
+            text("""
+                CAST(NULLIF(
+                    CASE WHEN length(COALESCE(
+                        NULLIF(regexp_replace(COALESCE(house_number, ''), '[^0-9]', '', 'g'), ''),
+                        NULLIF(substring(street from '^\d+'), '')
+                    )) BETWEEN 1 AND 9
+                    THEN COALESCE(
+                        NULLIF(regexp_replace(COALESCE(house_number, ''), '[^0-9]', '', 'g'), ''),
+                        NULLIF(substring(street from '^\d+'), '')
+                    )
+                    ELSE NULL END
+                , '') AS INTEGER) ASC NULLS LAST
+            """),
             Address.house_number,
             Address.street,
         )
