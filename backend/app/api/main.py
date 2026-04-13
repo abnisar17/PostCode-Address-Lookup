@@ -12,7 +12,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.deps import dispose_engine
 from app.api.errors import register_exception_handlers
-from app.api.routers import addresses, health, postcodes
+from app.api.middleware import ApiKeyMiddleware
+from app.api.routers import addresses, admin, health, postcodes
 from app.core.logging import setup_logging
 
 
@@ -78,9 +79,12 @@ def create_app() -> FastAPI:
     application.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
-        allow_methods=["GET"],
+        allow_methods=["GET", "POST", "PATCH", "DELETE"],
         allow_headers=["*"],
     )
+
+    # API key authentication (only enforced when REQUIRE_API_KEY=true)
+    application.add_middleware(ApiKeyMiddleware)
 
     # Disable browser caching for API responses
     @application.middleware("http")
@@ -98,6 +102,7 @@ def create_app() -> FastAPI:
     api.include_router(health.router)
     api.include_router(postcodes.router)
     api.include_router(addresses.router)
+    api.include_router(admin.router)
     application.include_router(api)
 
     return application

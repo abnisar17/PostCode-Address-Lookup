@@ -333,3 +333,49 @@ class UPRNCoordinate(Base):
     uprn: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     latitude: Mapped[float] = mapped_column(Float, nullable=False)
     longitude: Mapped[float] = mapped_column(Float, nullable=False)
+
+
+# ── API Key Management ─────────────────────────────────────────
+
+
+class ApiKey(Base):
+    """API key for authenticated access."""
+
+    __tablename__ = "api_keys"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    key: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    user_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    email: Mapped[str | None] = mapped_column(String(200))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    rate_limit_per_day: Mapped[int] = mapped_column(Integer, default=10000, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    usage_logs: Mapped[list["ApiUsage"]] = relationship(back_populates="api_key")
+
+
+class ApiUsage(Base):
+    """API usage log — tracks every request per API key."""
+
+    __tablename__ = "api_usage"
+    __table_args__ = (
+        Index("ix_api_usage_key_timestamp", "api_key_id", "timestamp"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    api_key_id: Mapped[int] = mapped_column(
+        ForeignKey("api_keys.id"), index=True, nullable=False
+    )
+    endpoint: Mapped[str] = mapped_column(String(200), nullable=False)
+    method: Mapped[str] = mapped_column(String(10), nullable=False)
+    query_params: Mapped[str | None] = mapped_column(Text)
+    status_code: Mapped[int] = mapped_column(Integer, nullable=False)
+    response_time_ms: Mapped[int | None] = mapped_column(Integer)
+    ip_address: Mapped[str | None] = mapped_column(String(45))
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    api_key: Mapped[ApiKey | None] = relationship(back_populates="usage_logs")

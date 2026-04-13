@@ -95,6 +95,8 @@ class Settings(BaseSettings):
     # API
     api_host: str = "0.0.0.0"
     api_port: int = 8000
+    require_api_key: bool = False  # Set to True to enforce API key auth
+    admin_password: str = "changeme"  # Set via ADMIN_PASSWORD env var
 
     # Logging
     log_level: str = "INFO"
