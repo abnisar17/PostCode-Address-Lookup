@@ -103,7 +103,7 @@ def create_app() -> FastAPI:
     api.include_router(postcodes.router)
     api.include_router(addresses.router)
     api.include_router(admin.router)
-    application.include_router(apidocs.router)
+    api.include_router(apidocs.router)
     application.include_router(api)
 
     return application

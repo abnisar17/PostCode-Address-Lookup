@@ -6,7 +6,7 @@ from fastapi.responses import HTMLResponse
 router = APIRouter(tags=["Documentation"])
 
 
-@router.get("/docs/api", response_class=HTMLResponse, summary="API Documentation", include_in_schema=False)
+@router.get("/documentation", response_class=HTMLResponse, summary="API Documentation", include_in_schema=False)
 async def api_documentation():
     return HTMLResponse(content="""
 <!DOCTYPE html>
