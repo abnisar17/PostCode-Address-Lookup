@@ -222,7 +222,8 @@ input,button{width:100%;padding:12px;margin:8px 0;border-radius:8px;border:1px s
 button{background:#3b82f6;color:white;border:none;cursor:pointer}button:hover{background:#2563eb}</style>
 </head><body>
 <h2>Admin Login</h2>
-<form method="GET"><input type="password" name="password" placeholder="Admin password" autofocus>
+<form onsubmit="event.preventDefault();window.location.href='?password='+encodeURIComponent(document.getElementById('pw').value)">
+<input type="password" id="pw" placeholder="Admin password" autofocus>
 <button type="submit">Login</button></form>
 </body></html>""")
 
@@ -281,7 +282,7 @@ button{{background:#3b82f6;color:white;border:none;cursor:pointer}}button:hover{
 </div></div>
 
 <script>
-const P = '?password={password}';
+const P = '?password=' + encodeURIComponent('{password}');
 const API = '/api/admin';
 
 function msg(text, ok) {{
