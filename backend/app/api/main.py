@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.deps import dispose_engine
 from app.api.errors import register_exception_handlers
 from app.api.middleware import ApiKeyMiddleware
-from app.api.routers import addresses, admin, health, postcodes
+from app.api.routers import addresses, admin, apidocs, health, postcodes
 from app.core.logging import setup_logging
 
 
@@ -103,6 +103,7 @@ def create_app() -> FastAPI:
     api.include_router(postcodes.router)
     api.include_router(addresses.router)
     api.include_router(admin.router)
+    application.include_router(apidocs.router)
     application.include_router(api)
 
     return application
