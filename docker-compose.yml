@@ -35,6 +35,8 @@ services:
       DATA_DIR: /data
       API_HOST: "0.0.0.0"
       API_PORT: "8000"
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-changeme}"
+      REQUIRE_API_KEY: "${REQUIRE_API_KEY:-false}"
       EPC_API_KEY: "${EPC_API_KEY:-}"
     ports:
       - "127.0.0.1:8000:8000"
@@ -50,6 +52,7 @@ services:
       context: ./frontend
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
+        VITE_API_KEY: ${VITE_API_KEY:-}
     ports:
       - "127.0.0.1:3000:3000"
     depends_on:

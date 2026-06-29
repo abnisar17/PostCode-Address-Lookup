@@ -344,7 +344,11 @@ class ApiKey(Base):
     __tablename__ = "api_keys"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    key: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    # Legacy plaintext column — kept for backward compat, unused for new keys.
+    key: Mapped[str | None] = mapped_column(String(64))
+    # Keys are stored as a SHA-256 hash; the raw key is shown only once.
+    key_hash: Mapped[str | None] = mapped_column(String(64), unique=True, index=True)
+    key_prefix: Mapped[str | None] = mapped_column(String(16))
     user_name: Mapped[str] = mapped_column(String(100), nullable=False)
     email: Mapped[str | None] = mapped_column(String(200))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
