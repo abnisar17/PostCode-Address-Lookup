@@ -8,6 +8,8 @@ set -euo pipefail
 SERVER_IP=$(hostname -I | awk '{print $1}')
 PROJECT_DIR="/opt/postcode-lookup"
 DUMP_FILE="/root/postcode_lookup.dump"
+# Public domain for TLS. Override with: DOMAIN=example.com bash deploy.sh
+DOMAIN="${DOMAIN:-getaddress.etakeawaymax.co.uk}"
 
 echo "==========================================="
 echo " PostcodeAddressLookup Deployment"
@@ -55,14 +57,28 @@ fi
 # 3. Configure Nginx reverse proxy
 # ----------------------------------------------------------
 echo ""
-echo "[3/7] Configuring Nginx reverse proxy (port 80 → Docker services)..."
+echo "[3/7] Configuring Nginx reverse proxy..."
 
 # Remove default site if it exists
 rm -f /etc/nginx/sites-enabled/default
 
-# Copy our proxy config
-cp "$PROJECT_DIR/deploy/nginx-proxy.conf" /etc/nginx/sites-available/postcode-lookup.conf 2>/dev/null \
-    || cp "$PROJECT_DIR/deploy/nginx-proxy.conf" /etc/nginx/conf.d/postcode-lookup.conf
+# Pick the TLS config if a Let's Encrypt cert already exists for the domain,
+# otherwise fall back to the HTTP-only bootstrap. This prevents a redeploy
+# from clobbering HTTPS (the TLS server block lived only on the server before).
+if [ -f "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem" ]; then
+    SRC_CONF="$PROJECT_DIR/deploy/nginx-proxy-tls.conf"
+    echo "    Cert found for ${DOMAIN} → installing HTTPS config."
+else
+    SRC_CONF="$PROJECT_DIR/deploy/nginx-proxy.conf"
+    echo "    No cert for ${DOMAIN} yet → installing HTTP-only bootstrap."
+    echo "    After deploy, issue a cert with:"
+    echo "      sudo certbot --nginx -d ${DOMAIN}"
+    echo "    then re-run this script to switch to HTTPS."
+fi
+
+# Copy the chosen config (sites-available style, else conf.d)
+cp "$SRC_CONF" /etc/nginx/sites-available/postcode-lookup.conf 2>/dev/null \
+    || cp "$SRC_CONF" /etc/nginx/conf.d/postcode-lookup.conf
 
 # Enable site (sites-available/sites-enabled style)
 if [ -d /etc/nginx/sites-enabled ]; then
@@ -71,7 +87,7 @@ fi
 
 nginx -t
 systemctl restart nginx
-echo "    Nginx configured: port 80 → frontend:3000 + /api → backend:8000"
+echo "    Nginx configured: $(basename "$SRC_CONF") → frontend:3000 + /api → backend:8000"
 
 # ----------------------------------------------------------
 # 4. Create production .env
