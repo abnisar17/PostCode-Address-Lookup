@@ -7,6 +7,9 @@ import type {
 } from './types';
 
 const BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000') + '/api';
+// Optional API key, baked in at build time. Sent as X-API-Key so the public
+// site keeps working when the backend has REQUIRE_API_KEY enabled.
+const API_KEY: string | undefined = import.meta.env.VITE_API_KEY;
 
 export class ApiError extends Error {
 	status: number;
@@ -33,7 +36,12 @@ async function get<T>(
 		}
 	}
 
-	const response = await fetch(url.toString(), { signal });
+	const headers: Record<string, string> = {};
+	if (API_KEY) {
+		headers['X-API-Key'] = API_KEY;
+	}
+
+	const response = await fetch(url.toString(), { signal, headers });
 
 	if (!response.ok) {
 		const body = await response.json().catch(() => ({ detail: response.statusText }));
