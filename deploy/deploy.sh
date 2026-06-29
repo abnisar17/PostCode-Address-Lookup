@@ -68,6 +68,10 @@ rm -f /etc/nginx/sites-enabled/default
 if [ -f "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem" ]; then
     SRC_CONF="$PROJECT_DIR/deploy/nginx-proxy-tls.conf"
     echo "    Cert found for ${DOMAIN} → installing HTTPS config."
+    # The TLS config references $api_key_final (browser key injection), so the
+    # map snippet must be present at http level for `nginx -t` to pass.
+    # Replace REPLACE_WITH_WEBSITE_KEY in this file with the real website key.
+    cp "$PROJECT_DIR/deploy/nginx-api-key-inject.conf" /etc/nginx/conf.d/api-key-inject.conf
 else
     SRC_CONF="$PROJECT_DIR/deploy/nginx-proxy.conf"
     echo "    No cert for ${DOMAIN} yet → installing HTTP-only bootstrap."
