@@ -355,7 +355,13 @@ button{background:#3b82f6;color:white;border:none;cursor:pointer}button:hover{ba
 <div><label>Daily Limit</label><br><input id="rateLimit" type="number" value="10000" min="1"></div>
 <div><label>&nbsp;</label><br><button onclick="createKey()">Create Key</button></div>
 </div>
-<p style="font-size:12px;color:#64748b">The full key is shown only once, at creation. Only a prefix is stored for display.</p>
+<p style="font-size:12px;color:#64748b">The full key is shown only once, at creation. Only a prefix is stored for display, so it cannot be recovered later.</p>
+<div id="newKey" style="display:none;margin-top:12px;padding:12px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px">
+<strong>New key — copy it now, it will NOT be shown again:</strong>
+<div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+<span id="newKeyVal" class="key-text" style="flex:1"></span>
+<button style="flex:0;white-space:nowrap" onclick="copyNewKey()">Copy</button>
+</div></div>
 </div>
 
 <div class="card">
@@ -370,6 +376,7 @@ button{background:#3b82f6;color:white;border:none;cursor:pointer}button:hover{ba
 <script>
 const API = '/api/admin';
 const OPTS = { credentials: 'same-origin' };  // send the session cookie
+let KEYS = [];  // latest loaded keys, for id->name lookups
 
 function msg(text, ok) {
   const el = document.getElementById('msg');
@@ -394,6 +401,7 @@ async function loadKeys() {
   const res = await fetch(API + '/keys', OPTS);
   if (res.status === 401) { location.reload(); return; }
   const keys = await res.json();
+  KEYS = keys;
   const tbody = document.getElementById('keyTable');
   const stats = document.getElementById('keyStats');
 
@@ -424,7 +432,7 @@ async function loadKeys() {
     <td style="font-size:12px;color:#94a3b8">${k.last_used ? new Date(k.last_used).toLocaleDateString() : 'Never'}</td>
     <td>
       <button class="btn-yellow" style="padding:4px 10px;font-size:12px" onclick="toggleKey(${k.id})">${k.is_active ? 'Disable' : 'Enable'}</button>
-      <button class="btn-red" style="padding:4px 10px;font-size:12px" onclick="deleteKey(${k.id}, ${JSON.stringify(esc(k.user_name))})">Delete</button>
+      <button class="btn-red" style="padding:4px 10px;font-size:12px" onclick="deleteKey(${k.id})">Delete</button>
     </td>
   </tr>`).join('');
 }
@@ -442,8 +450,15 @@ async function createKey() {
   });
   if (res.ok) {
     const key = await res.json();
-    msg('Key created — copy it now, it will NOT be shown again: ' + key.key, true);
-    if (navigator.clipboard) navigator.clipboard.writeText(key.key).catch(() => {});
+    document.getElementById('newKeyVal').textContent = key.key;
+    document.getElementById('newKey').style.display = 'block';
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(key.key)
+        .then(() => msg('Key created and copied to clipboard', true))
+        .catch(() => msg('Key created — copy it from the box above', true));
+    } else {
+      msg('Key created — copy it from the box above', true);
+    }
     document.getElementById('userName').value = '';
     document.getElementById('email').value = '';
     loadKeys();
@@ -453,7 +468,16 @@ async function createKey() {
   }
 }
 
-async function deleteKey(id, name) {
+function copyNewKey() {
+  const v = document.getElementById('newKeyVal').textContent;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(v).then(() => msg('Copied to clipboard', true));
+  }
+}
+
+async function deleteKey(id) {
+  const k = KEYS.find(x => x.id === id);
+  const name = k ? k.user_name : 'this user';
   if (!confirm('Delete key for ' + name + '? This will also delete all usage logs.')) return;
   const res = await fetch(API + '/keys/' + id, { method: 'DELETE', ...OPTS });
   if (res.ok) { msg('Key deleted', true); loadKeys(); }
