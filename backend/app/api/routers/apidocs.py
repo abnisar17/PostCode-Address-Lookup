@@ -177,17 +177,21 @@ pre code { background: none; color: inherit; padding: 0; font-weight: 400; }
 <!-- Authentication -->
 <div class="section" id="auth">
   <h2><span class="icon" style="background:#eff6ff;color:#2563eb">&#128274;</span> Authentication</h2>
-  <p>All API requests require an API key for authentication. You can include it in two ways:</p>
+  <p>Every API request (except <code>/api/health</code>) requires a valid API key. You can supply it in two ways:</p>
 
-  <h3>Option 1: Query Parameter (recommended)</h3>
-  <pre><code>GET /api/postcodes/SW1A1AA<span class="code-string">?apiKey=YOUR_API_KEY</span></code></pre>
-
-  <h3>Option 2: HTTP Header</h3>
+  <h3>Option 1: HTTP Header <span class="badge optional" style="background:#dcfce7;color:#166534;border:1px solid #86efac">recommended</span></h3>
   <pre><code><span class="code-key">X-API-Key:</span> <span class="code-string">YOUR_API_KEY</span></code></pre>
 
+  <h3>Option 2: Query Parameter</h3>
+  <pre><code>GET /api/postcodes/SW1A1AA<span class="code-string">?apiKey=YOUR_API_KEY</span></code></pre>
+
+  <div class="note">
+    <span class="note-icon">&#9888;</span>
+    <span>Prefer the <code>X-API-Key</code> header. A key placed in the URL query string can be recorded in server logs, proxy logs, and browser history.</span>
+  </div>
   <div class="note">
     <span class="note-icon">&#9432;</span>
-    <span>Contact your administrator to obtain an API key. Each key has a configurable daily rate limit (default: 10,000 requests/day).</span>
+    <span>Contact your administrator to obtain an API key. Each key has a configurable daily rate limit (default: 10,000 requests/day). A missing key returns <code>401</code>; an invalid or deactivated key returns <code>403</code>.</span>
   </div>
 </div>
 
@@ -208,7 +212,7 @@ pre code { background: none; color: inherit; padding: 0; font-weight: 400; }
         <thead><tr><th>Parameter</th><th>Location</th><th>Description</th></tr></thead>
         <tbody>
           <tr><td>postcode</td><td>path <span class="badge required">required</span></td><td>UK postcode in any format (e.g. SW1A1AA, SW1A 1AA, sw1a1aa)</td></tr>
-          <tr><td>apiKey</td><td>query <span class="badge required">required</span></td><td>Your API key</td></tr>
+          <tr><td>X-API-Key</td><td>header <span class="badge required">required</span></td><td>Your API key (or <code>?apiKey=</code> query param)</td></tr>
           <tr><td>page</td><td>query <span class="badge optional">optional</span></td><td>Page number, starting from 1 (default: 1)</td></tr>
           <tr><td>page_size</td><td>query <span class="badge optional">optional</span></td><td>Number of addresses per page (default: 20, max: 100)</td></tr>
         </tbody>
@@ -258,7 +262,7 @@ GET /api/postcodes/SO230QD?apiKey=YOUR_API_KEY&page=1&page_size=50</code></pre>
         <thead><tr><th>Parameter</th><th>Location</th><th>Description</th></tr></thead>
         <tbody>
           <tr><td>q</td><td>query <span class="badge required">required</span></td><td>Postcode prefix, minimum 2 characters (e.g. SW1A, EC1, M1)</td></tr>
-          <tr><td>apiKey</td><td>query <span class="badge required">required</span></td><td>Your API key</td></tr>
+          <tr><td>X-API-Key</td><td>header <span class="badge required">required</span></td><td>Your API key (or <code>?apiKey=</code> query param)</td></tr>
           <tr><td>limit</td><td>query <span class="badge optional">optional</span></td><td>Maximum suggestions to return (default: 10, max: 50)</td></tr>
         </tbody>
       </table>
@@ -293,7 +297,7 @@ GET /api/postcodes/SO230QD?apiKey=YOUR_API_KEY&page=1&page_size=50</code></pre>
           <tr><td>street</td><td>query <span class="badge optional">optional</span></td><td>Filter by street name</td></tr>
           <tr><td>city</td><td>query <span class="badge optional">optional</span></td><td>Filter by city name</td></tr>
           <tr><td>postcode</td><td>query <span class="badge optional">optional</span></td><td>Filter by postcode</td></tr>
-          <tr><td>apiKey</td><td>query <span class="badge required">required</span></td><td>Your API key</td></tr>
+          <tr><td>X-API-Key</td><td>header <span class="badge required">required</span></td><td>Your API key (or <code>?apiKey=</code> query param)</td></tr>
           <tr><td>page</td><td>query <span class="badge optional">optional</span></td><td>Page number (default: 1)</td></tr>
           <tr><td>page_size</td><td>query <span class="badge optional">optional</span></td><td>Results per page (default: 20)</td></tr>
         </tbody>
@@ -316,7 +320,7 @@ GET /api/postcodes/SO230QD?apiKey=YOUR_API_KEY&page=1&page_size=50</code></pre>
         <thead><tr><th>Parameter</th><th>Location</th><th>Description</th></tr></thead>
         <tbody>
           <tr><td>id</td><td>path <span class="badge required">required</span></td><td>Address ID (from search or postcode lookup results)</td></tr>
-          <tr><td>apiKey</td><td>query <span class="badge required">required</span></td><td>Your API key</td></tr>
+          <tr><td>X-API-Key</td><td>header <span class="badge required">required</span></td><td>Your API key (or <code>?apiKey=</code> query param)</td></tr>
         </tbody>
       </table>
       <h3>Example</h3>
@@ -358,6 +362,7 @@ GET /api/postcodes/SO230QD?apiKey=YOUR_API_KEY&page=1&page_size=50</code></pre>
       <tr><td class="code-400">403</td><td>Forbidden</td><td>API key is invalid or has been deactivated by the administrator.</td></tr>
       <tr><td class="code-400">404</td><td>Not Found</td><td>The requested postcode or address does not exist in the database.</td></tr>
       <tr><td class="code-400">422</td><td>Unprocessable</td><td>Invalid input format (e.g. malformed postcode or missing required parameters).</td></tr>
+      <tr><td class="code-400">429</td><td>Too Many Requests</td><td>Your key's daily rate limit has been exceeded. Resets at midnight UTC.</td></tr>
       <tr><td class="code-500">500</td><td>Server Error</td><td>An unexpected error occurred. Please contact the administrator.</td></tr>
     </tbody>
   </table>
@@ -425,22 +430,21 @@ GET /api/postcodes/SO230QD?apiKey=YOUR_API_KEY&page=1&page_size=50</code></pre>
     <pre><code><span class="code-comment">// JavaScript / Node.js</span>
 const API_KEY = <span class="code-string">'YOUR_API_KEY'</span>;
 const BASE = <span class="code-string">'https://getaddress.etakeawaymax.co.uk/api'</span>;
+const headers = { <span class="code-string">'X-API-Key'</span>: API_KEY };
 
 <span class="code-comment">// Postcode lookup</span>
-const res = await fetch(
-  `${BASE}/postcodes/SW1A1AA?apiKey=${API_KEY}`
-);
+const res = await fetch(`${BASE}/postcodes/SW1A1AA`, { headers });
 const data = await res.json();
 console.log(`Found ${data.total} addresses`);
 
 <span class="code-comment">// Autocomplete for search-as-you-type</span>
 const suggestions = await fetch(
-  `${BASE}/postcodes/autocomplete?q=SW1A&apiKey=${API_KEY}`
+  `${BASE}/postcodes/autocomplete?q=SW1A`, { headers }
 ).then(r => r.json());
 
 <span class="code-comment">// Address search</span>
 const results = await fetch(
-  `${BASE}/addresses/search?city=London&street=Downing&apiKey=${API_KEY}`
+  `${BASE}/addresses/search?city=London&street=Downing`, { headers }
 ).then(r => r.json());</code></pre>
   </div>
 
@@ -450,33 +454,35 @@ import requests
 
 API_KEY = <span class="code-string">'YOUR_API_KEY'</span>
 BASE = <span class="code-string">'https://getaddress.etakeawaymax.co.uk/api'</span>
+headers = {<span class="code-string">'X-API-Key'</span>: API_KEY}
 
 <span class="code-comment"># Postcode lookup</span>
-r = requests.get(f'{BASE}/postcodes/SW1A1AA', params={'apiKey': API_KEY})
+r = requests.get(f'{BASE}/postcodes/SW1A1AA', headers=headers)
 data = r.json()
 print(f"Found {data['total']} addresses")
 
 <span class="code-comment"># Address search</span>
-r = requests.get(f'{BASE}/addresses/search', params={
+r = requests.get(f'{BASE}/addresses/search', headers=headers, params={
     'q': 'Downing Street',
     'city': 'London',
-    'apiKey': API_KEY
 })</code></pre>
   </div>
 
   <div class="code-panel" id="panel-curl">
-    <pre><code><span class="code-comment"># cURL - Postcode lookup</span>
-curl <span class="code-string">"https://getaddress.etakeawaymax.co.uk/api/postcodes/SW1A1AA?apiKey=YOUR_API_KEY"</span>
-
-<span class="code-comment"># Using header authentication</span>
+    <pre><code><span class="code-comment"># cURL - Postcode lookup (header auth, recommended)</span>
 curl -H <span class="code-string">"X-API-Key: YOUR_API_KEY"</span> \\
   <span class="code-string">"https://getaddress.etakeawaymax.co.uk/api/postcodes/SW1A1AA"</span>
 
 <span class="code-comment"># Autocomplete</span>
-curl <span class="code-string">"https://getaddress.etakeawaymax.co.uk/api/postcodes/autocomplete?q=SW1A&apiKey=YOUR_API_KEY"</span>
+curl -H <span class="code-string">"X-API-Key: YOUR_API_KEY"</span> \\
+  <span class="code-string">"https://getaddress.etakeawaymax.co.uk/api/postcodes/autocomplete?q=SW1A"</span>
 
 <span class="code-comment"># Address search</span>
-curl <span class="code-string">"https://getaddress.etakeawaymax.co.uk/api/addresses/search?city=London&apiKey=YOUR_API_KEY"</span></code></pre>
+curl -H <span class="code-string">"X-API-Key: YOUR_API_KEY"</span> \\
+  <span class="code-string">"https://getaddress.etakeawaymax.co.uk/api/addresses/search?city=London"</span>
+
+<span class="code-comment"># Alternative: key in the query string</span>
+curl <span class="code-string">"https://getaddress.etakeawaymax.co.uk/api/postcodes/SW1A1AA?apiKey=YOUR_API_KEY"</span></code></pre>
   </div>
 
   <div class="code-panel" id="panel-php">
@@ -484,18 +490,15 @@ curl <span class="code-string">"https://getaddress.etakeawaymax.co.uk/api/addres
 $apiKey = <span class="code-string">'YOUR_API_KEY'</span>;
 $base = <span class="code-string">'https://getaddress.etakeawaymax.co.uk/api'</span>;
 
-<span class="code-comment">// Postcode lookup</span>
-$url = "{$base}/postcodes/SW1A1AA?apiKey={$apiKey}";
-$response = file_get_contents($url);
-$data = json_decode($response, true);
-echo "Found " . $data['total'] . " addresses";
-
-<span class="code-comment">// Using cURL</span>
-$ch = curl_init("{$base}/postcodes/SW1A1AA?apiKey={$apiKey}");
+<span class="code-comment">// Postcode lookup with header auth (recommended)</span>
+$ch = curl_init("{$base}/postcodes/SW1A1AA");
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, ["X-API-Key: {$apiKey}"]);
 $response = curl_exec($ch);
+curl_close($ch);
+
 $data = json_decode($response, true);
-curl_close($ch);</code></pre>
+echo "Found " . $data['total'] . " addresses";</code></pre>
   </div>
 
   <div class="code-panel" id="panel-csharp">
@@ -581,7 +584,7 @@ async function tryApi() {
   codeEl.textContent = 'Loading...';
 
   try {
-    const res = await fetch(`/api/postcodes/${postcode}?apiKey=${encodeURIComponent(apiKey)}`);
+    const res = await fetch(`/api/postcodes/${postcode}`, { headers: { 'X-API-Key': apiKey } });
     const data = await res.json();
     codeEl.textContent = JSON.stringify(data, null, 2);
   } catch (err) {
