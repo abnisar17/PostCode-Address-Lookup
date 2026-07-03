@@ -25,7 +25,8 @@ from app.api.security import (
     make_admin_session,
     valid_admin_session,
 )
-from app.core.db.models import ApiKey, ApiUsage
+from app.core.db.models import Address, AddressSubmission, ApiKey, ApiUsage, Postcode
+from app.core.utils.postcode import postcode_no_space
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
@@ -272,6 +273,139 @@ async def key_usage(
     ]
 
 
+# ── Address Submissions (moderation queue) ─────────────────────
+
+
+class SubmissionResponse(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: int
+    postcode_raw: str | None
+    house_number: str | None
+    house_name: str | None
+    flat: str | None
+    street: str | None
+    city: str | None
+    county: str | None
+    status: str
+    review_note: str | None
+    created_at: datetime
+    reviewed_at: datetime | None
+
+
+class RejectRequest(BaseModel):
+    reason: str | None = Field(default=None, max_length=500)
+
+
+@router.get(
+    "/submissions",
+    response_model=list[SubmissionResponse],
+    summary="List user-submitted addresses (default: pending)",
+)
+async def list_submissions(
+    request: Request,
+    status: str = Query(default="pending", pattern="^(pending|approved|rejected|all)$"),
+    db: AsyncSession = Depends(get_db),
+):
+    _check_admin(request)
+
+    stmt = select(AddressSubmission).order_by(AddressSubmission.created_at.desc())
+    if status != "all":
+        stmt = stmt.where(AddressSubmission.status == status)
+    result = await db.execute(stmt.limit(500))
+    return list(result.scalars().all())
+
+
+@router.post(
+    "/submissions/{submission_id}/approve",
+    summary="Approve a submission — creates a live address",
+)
+async def approve_submission(
+    submission_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    _check_admin(request)
+
+    sub = await db.scalar(
+        select(AddressSubmission).where(AddressSubmission.id == submission_id)
+    )
+    if sub is None:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    if sub.status != "pending":
+        raise HTTPException(status_code=409, detail=f"Submission already {sub.status}")
+
+    postcode_row = await db.scalar(
+        select(Postcode).where(
+            Postcode.postcode_no_space == postcode_no_space(sub.postcode_norm or "")
+        )
+    )
+    if postcode_row is None:
+        raise HTTPException(status_code=422, detail="Postcode no longer exists")
+
+    location = None
+    if postcode_row.latitude is not None and postcode_row.longitude is not None:
+        location = func.ST_SetSRID(
+            func.ST_MakePoint(postcode_row.longitude, postcode_row.latitude), 4326
+        )
+
+    address = Address(
+        postcode_id=postcode_row.id,
+        postcode_raw=sub.postcode_raw,
+        postcode_norm=sub.postcode_norm,
+        house_number=sub.house_number,
+        house_name=sub.house_name,
+        flat=sub.flat,
+        street=sub.street,
+        city=sub.city,
+        county=sub.county,
+        latitude=postcode_row.latitude,
+        longitude=postcode_row.longitude,
+        location=location,
+        source="user_submitted",
+        source_id=f"user:{sub.id}",
+        confidence=0.5,
+        is_complete=bool((sub.house_number or sub.house_name) and sub.street),
+    )
+    db.add(address)
+    await db.flush()
+
+    sub.status = "approved"
+    sub.address_id = address.id
+    sub.reviewed_at = datetime.now(timezone.utc)
+    await db.commit()
+
+    return {"detail": "Approved and added to the database", "address_id": address.id}
+
+
+@router.post(
+    "/submissions/{submission_id}/reject",
+    summary="Reject a submission",
+)
+async def reject_submission(
+    submission_id: int,
+    request: Request,
+    body: RejectRequest | None = None,
+    db: AsyncSession = Depends(get_db),
+):
+    _check_admin(request)
+
+    sub = await db.scalar(
+        select(AddressSubmission).where(AddressSubmission.id == submission_id)
+    )
+    if sub is None:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    if sub.status != "pending":
+        raise HTTPException(status_code=409, detail=f"Submission already {sub.status}")
+
+    sub.status = "rejected"
+    sub.review_note = body.reason if body else None
+    sub.reviewed_at = datetime.now(timezone.utc)
+    await db.commit()
+
+    return {"detail": "Submission rejected"}
+
+
 # ── Admin Dashboard (HTML) ─────────────────────────────────────
 
 
@@ -371,6 +505,15 @@ button{background:#3b82f6;color:white;border:none;cursor:pointer}button:hover{ba
 <table><thead><tr>
 <th>User</th><th>Key</th><th>Status</th><th>Today</th><th>Total</th><th>Limit/day</th><th>Last Used</th><th>Actions</th>
 </tr></thead><tbody id="keyTable"><tr><td colspan="8">Loading...</td></tr></tbody></table>
+</div></div>
+
+<div class="card">
+<h3>Pending Addresses <span id="subCount" style="color:#ef4444;font-weight:700"></span></h3>
+<p style="font-size:12px;color:#64748b">User-submitted addresses awaiting review. Approving adds them to the live database.</p>
+<div style="overflow-x:auto">
+<table><thead><tr>
+<th>Postcode</th><th>Address</th><th>Submitted</th><th>Actions</th>
+</tr></thead><tbody id="subTable"><tr><td colspan="4">Loading...</td></tr></tbody></table>
 </div></div>
 
 <script>
@@ -490,5 +633,47 @@ async function toggleKey(id) {
   else { msg('Failed to toggle', false); }
 }
 
+async function loadSubmissions() {
+  const res = await fetch(API + '/submissions?status=pending', OPTS);
+  if (res.status === 401) { location.reload(); return; }
+  const subs = await res.json();
+  const tbody = document.getElementById('subTable');
+  document.getElementById('subCount').textContent = subs.length ? '(' + subs.length + ')' : '';
+  if (!subs.length) {
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#94a3b8">No pending submissions</td></tr>';
+    return;
+  }
+  tbody.innerHTML = subs.map(s => {
+    const parts = [s.flat, s.house_number, s.house_name, s.street, s.city, s.county]
+      .filter(Boolean).map(esc).join(', ');
+    return `<tr>
+      <td><strong>${esc(s.postcode_raw || '')}</strong></td>
+      <td>${parts || '<span style="color:#94a3b8">(no detail)</span>'}</td>
+      <td style="font-size:12px;color:#94a3b8">${new Date(s.created_at).toLocaleDateString()}</td>
+      <td>
+        <button style="padding:4px 10px;font-size:12px;background:#22c55e;color:white;border:none;border-radius:8px;cursor:pointer" onclick="approveSub(${s.id})">Approve</button>
+        <button class="btn-red" style="padding:4px 10px;font-size:12px" onclick="rejectSub(${s.id})">Reject</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function approveSub(id) {
+  const res = await fetch(API + '/submissions/' + id + '/approve', { method: 'POST', ...OPTS });
+  if (res.ok) { msg('Address approved and added to the database', true); loadSubmissions(); }
+  else { const e = await res.json().catch(() => ({})); msg(e.detail || 'Approve failed', false); }
+}
+
+async function rejectSub(id) {
+  const reason = prompt('Reason for rejecting (optional):');
+  const res = await fetch(API + '/submissions/' + id + '/reject', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason: reason || null }), ...OPTS
+  });
+  if (res.ok) { msg('Submission rejected', true); loadSubmissions(); }
+  else { msg('Reject failed', false); }
+}
+
 loadKeys();
+loadSubmissions();
 </script></body></html>""")

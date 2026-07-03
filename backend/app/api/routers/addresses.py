@@ -5,7 +5,8 @@ with offset pagination, plus retrieval of a single address by its database ID
 including linked enrichment data (house prices, companies, food ratings).
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
+from pydantic import BaseModel, Field
 from sqlalchemy import func, literal_column, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -21,8 +22,8 @@ from app.api.schemas import (
     PricePaidResponse,
     VOARatingResponse,
 )
-from app.core.db.models import Address
-from app.core.utils.postcode import normalise_postcode
+from app.core.db.models import Address, AddressSubmission, Postcode
+from app.core.utils.postcode import normalise_postcode, postcode_no_space
 
 router = APIRouter(prefix="/addresses", tags=["Addresses"])
 
@@ -258,3 +259,89 @@ async def get_address(
         VOARatingResponse.model_validate(vr) for vr in address.voa_rating_records
     ]
     return detail
+
+
+# ── Submit a missing address (moderation queue) ──────────────────
+
+
+class AddressSubmitRequest(BaseModel):
+    postcode: str = Field(min_length=5, max_length=10, examples=["HG1 2BP"])
+    house_number: str | None = Field(default=None, max_length=100, examples=["15"])
+    house_name: str | None = Field(default=None, max_length=200)
+    flat: str | None = Field(default=None, max_length=50)
+    street: str | None = Field(default=None, max_length=200, examples=["Fewston Crescent"])
+    city: str | None = Field(default=None, max_length=100, examples=["Harrogate"])
+    county: str | None = Field(default=None, max_length=100)
+
+
+class AddressSubmitResponse(BaseModel):
+    detail: str
+    id: int
+
+
+@router.post(
+    "/submit",
+    response_model=AddressSubmitResponse,
+    status_code=201,
+    summary="Submit a missing address for review",
+    description=(
+        "Submit an address that is missing from the database. Submissions are "
+        "**not** added immediately — they enter a moderation queue and appear "
+        "in search only after an administrator approves them."
+    ),
+    responses={
+        201: {"description": "Submission received and queued for review"},
+        404: {"model": ErrorResponse, "description": "Postcode not found in the database"},
+        422: {"model": ErrorResponse, "description": "Invalid postcode or no address detail provided"},
+    },
+)
+async def submit_address(
+    body: AddressSubmitRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> AddressSubmitResponse:
+    normalised = normalise_postcode(body.postcode)
+    if normalised is None:
+        raise HTTPException(
+            status_code=422, detail=f"'{body.postcode}' is not a valid UK postcode format"
+        )
+
+    # The postcode must exist in our dataset (submissions attach to a real postcode).
+    no_space = postcode_no_space(normalised)
+    postcode_row = await db.scalar(
+        select(Postcode).where(Postcode.postcode_no_space == no_space)
+    )
+    if postcode_row is None:
+        raise HTTPException(status_code=404, detail=f"Postcode '{normalised}' not found")
+
+    # Require at least a street or a house identifier — reject empty submissions.
+    if not (body.house_number or body.house_name or body.street):
+        raise HTTPException(
+            status_code=422,
+            detail="Provide at least a street name or a house number/name.",
+        )
+
+    def _clean(v: str | None) -> str | None:
+        v = v.strip() if v else None
+        return v or None
+
+    submission = AddressSubmission(
+        postcode_raw=body.postcode.strip().upper(),
+        postcode_norm=normalised,
+        house_number=_clean(body.house_number),
+        house_name=_clean(body.house_name),
+        flat=_clean(body.flat),
+        street=_clean(body.street),
+        city=_clean(body.city),
+        county=_clean(body.county),
+        status="pending",
+        submitter_ip=request.client.host if request.client else None,
+    )
+    db.add(submission)
+    await db.commit()
+    await db.refresh(submission)
+
+    return AddressSubmitResponse(
+        detail="Thanks — your address has been submitted and will appear once reviewed.",
+        id=submission.id,
+    )
