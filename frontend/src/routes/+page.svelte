@@ -5,6 +5,7 @@
 	import PostcodeSearch from '$lib/components/PostcodeSearch.svelte';
 	import AddressList from '$lib/components/AddressList.svelte';
 	import AddressSearch from '$lib/components/AddressSearch.svelte';
+	import AddAddressForm from '$lib/components/AddAddressForm.svelte';
 	import Spinner from '$lib/components/Spinner.svelte';
 
 	const tabs = [
@@ -86,6 +87,10 @@
 				total={lookupResult.total}
 				onpagechange={handlePageChange}
 			/>
+
+			{#key lookupResult.postcode.postcode_no_space}
+				<AddAddressForm postcode={lookupResult.postcode.postcode} />
+			{/key}
 		{:else}
 			<div class="py-12 text-center text-gray-400">
 				<p class="text-lg">Start typing a postcode to search</p>

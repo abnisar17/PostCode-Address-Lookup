@@ -97,5 +97,31 @@ export const api = {
 
 	getAddress(id: number): Promise<AddressResponse> {
 		return get<AddressResponse>(`/addresses/${id}`);
+	},
+
+	submitAddress(payload: {
+		postcode: string;
+		house_number?: string;
+		house_name?: string;
+		flat?: string;
+		street?: string;
+		city?: string;
+		county?: string;
+	}): Promise<{ detail: string; id: number }> {
+		const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+		if (API_KEY) {
+			headers['X-API-Key'] = API_KEY;
+		}
+		return fetch(BASE_URL + '/addresses/submit', {
+			method: 'POST',
+			headers,
+			body: JSON.stringify(payload)
+		}).then(async (res) => {
+			if (!res.ok) {
+				const body = await res.json().catch(() => ({ detail: res.statusText }));
+				throw new ApiError(res.status, body.detail || res.statusText);
+			}
+			return res.json();
+		});
 	}
 };

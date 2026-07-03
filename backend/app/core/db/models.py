@@ -383,3 +383,45 @@ class ApiUsage(Base):
     )
 
     api_key: Mapped[ApiKey | None] = relationship(back_populates="usage_logs")
+
+
+# ── User-submitted "missing address" moderation queue ──────────
+
+
+class AddressSubmission(Base):
+    """A user-submitted missing address awaiting admin moderation.
+
+    Submissions never touch the live ``addresses`` table until an admin
+    approves them, at which point a proper Address row is created.
+    """
+
+    __tablename__ = "address_submissions"
+    __table_args__ = (
+        Index("ix_address_submissions_status", "status"),
+        Index("ix_address_submissions_postcode_norm", "postcode_norm"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+
+    postcode_raw: Mapped[str | None] = mapped_column(String(20))
+    postcode_norm: Mapped[str | None] = mapped_column(String(10))
+
+    house_number: Mapped[str | None] = mapped_column(String(100))
+    house_name: Mapped[str | None] = mapped_column(String(200))
+    flat: Mapped[str | None] = mapped_column(String(50))
+    street: Mapped[str | None] = mapped_column(String(200))
+    city: Mapped[str | None] = mapped_column(String(100))
+    county: Mapped[str | None] = mapped_column(String(100))
+
+    # pending | approved | rejected
+    status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
+    review_note: Mapped[str | None] = mapped_column(Text)
+    submitter_ip: Mapped[str | None] = mapped_column(String(45))
+
+    # Set to the created Address once approved.
+    address_id: Mapped[int | None] = mapped_column(ForeignKey("addresses.id"))
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
