@@ -99,12 +99,11 @@ class Settings(BaseSettings):
     admin_password: str = "changeme"  # Set via ADMIN_PASSWORD env var
     public_base_url: str = "https://getaddress.etakeawaymax.co.uk"  # for links in alerts
 
-    # Email alerts (SMTP) — alerts are only sent when host/from/recipients are set
-    smtp_host: str = ""
-    smtp_port: int = 587
-    smtp_user: str = ""
-    smtp_password: str = ""
-    smtp_from: str = ""
+    # Email alerts via Resend (https://resend.com) — sent only when configured
+    resend_api_key: str = ""
+    email_from_address: str = ""
+    email_from_name: str = "Get Address"
+    email_daily_send_cap: int = 3000
     alert_email_to: str = ""  # comma-separated recipient(s)
 
     # Logging

@@ -38,12 +38,11 @@ services:
       ADMIN_PASSWORD: "${ADMIN_PASSWORD:-changeme}"
       REQUIRE_API_KEY: "${REQUIRE_API_KEY:-false}"
       EPC_API_KEY: "${EPC_API_KEY:-}"
-      # Email alerts for new pending submissions (leave empty to disable)
-      SMTP_HOST: "${SMTP_HOST:-}"
-      SMTP_PORT: "${SMTP_PORT:-587}"
-      SMTP_USER: "${SMTP_USER:-}"
-      SMTP_PASSWORD: "${SMTP_PASSWORD:-}"
-      SMTP_FROM: "${SMTP_FROM:-}"
+      # Email alerts for new pending submissions via Resend (empty = disabled)
+      RESEND_API_KEY: "${RESEND_API_KEY:-}"
+      EMAIL_FROM_ADDRESS: "${EMAIL_FROM_ADDRESS:-}"
+      EMAIL_FROM_NAME: "${EMAIL_FROM_NAME:-Get Address}"
+      EMAIL_DAILY_SEND_CAP: "${EMAIL_DAILY_SEND_CAP:-3000}"
       ALERT_EMAIL_TO: "${ALERT_EMAIL_TO:-}"
     ports:
       - "127.0.0.1:8000:8000"
