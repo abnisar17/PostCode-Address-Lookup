@@ -97,6 +97,15 @@ class Settings(BaseSettings):
     api_port: int = 8000
     require_api_key: bool = False  # Set to True to enforce API key auth
     admin_password: str = "changeme"  # Set via ADMIN_PASSWORD env var
+    public_base_url: str = "https://getaddress.etakeawaymax.co.uk"  # for links in alerts
+
+    # Email alerts (SMTP) — alerts are only sent when host/from/recipients are set
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
+    alert_email_to: str = ""  # comma-separated recipient(s)
 
     # Logging
     log_level: str = "INFO"

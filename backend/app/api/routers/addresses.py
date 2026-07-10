@@ -7,13 +7,23 @@ including linked enrichment data (house prices, companies, food ratings).
 
 import re
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    HTTPException,
+    Path,
+    Query,
+    Request,
+    Response,
+)
 from pydantic import BaseModel, Field
 from sqlalchemy import func, literal_column, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.api.deps import get_db
+from app.api.deps import get_db, get_settings
+from app.core.email import send_email
 from app.api.schemas import (
     AddressDetailResponse,
     AddressListResponse,
@@ -300,6 +310,7 @@ class AddressSubmitResponse(BaseModel):
 async def submit_address(
     body: AddressSubmitRequest,
     request: Request,
+    background: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ) -> AddressSubmitResponse:
     normalised = normalise_postcode(body.postcode)
@@ -342,6 +353,26 @@ async def submit_address(
     db.add(submission)
     await db.commit()
     await db.refresh(submission)
+
+    # Notify the admin in the background (never blocks the response).
+    settings = get_settings()
+    address_line = ", ".join(
+        p for p in [
+            submission.flat, submission.house_number, submission.house_name,
+            submission.street, submission.city, submission.county,
+        ] if p
+    )
+    background.add_task(
+        send_email,
+        settings,
+        f"New address submission — {submission.postcode_raw}",
+        (
+            "A new address has been submitted for review.\n\n"
+            f"Postcode: {submission.postcode_raw}\n"
+            f"Address:  {address_line or '(no detail)'}\n\n"
+            f"Review and approve it here:\n{settings.public_base_url}/api/admin/dashboard\n"
+        ),
+    )
 
     return AddressSubmitResponse(
         detail="Thanks — your address has been submitted and will appear once reviewed.",
