@@ -120,6 +120,9 @@ class ApiKeyMiddleware(BaseHTTPMiddleware):
                     },
                 )
 
+            # Expose the authenticated key to downstream endpoints (attribution).
+            request.state.api_key_id = key_record.id
+
             # Process request and measure response time
             start = time.monotonic()
             response = await call_next(request)

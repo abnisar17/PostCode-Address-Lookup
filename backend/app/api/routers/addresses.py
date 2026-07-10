@@ -5,7 +5,9 @@ with offset pagination, plus retrieval of a single address by its database ID
 including linked enrichment data (house prices, companies, food ratings).
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
+import re
+
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import func, literal_column, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -344,4 +346,165 @@ async def submit_address(
     return AddressSubmitResponse(
         detail="Thanks — your address has been submitted and will appear once reviewed.",
         id=submission.id,
+    )
+
+
+# ── Direct add via API (authenticated, no queue) ─────────────────
+
+# Street-suffix abbreviations, expanded only on the LAST token for dedup
+# comparison (so leading "St" = Saint is never mangled).
+_STREET_SUFFIX = {
+    "ST": "STREET", "RD": "ROAD", "AVE": "AVENUE", "AV": "AVENUE",
+    "CRES": "CRESCENT", "CR": "CRESCENT", "LN": "LANE", "DR": "DRIVE",
+    "CT": "COURT", "PL": "PLACE", "SQ": "SQUARE", "GDNS": "GARDENS",
+    "TER": "TERRACE", "CL": "CLOSE", "PK": "PARK", "GRV": "GROVE",
+}
+
+
+def _norm_token(value: str | None) -> str:
+    """Uppercase, strip punctuation, collapse whitespace — for dedup matching."""
+    if not value:
+        return ""
+    v = re.sub(r"[.,]", " ", value.upper())
+    return re.sub(r"\s+", " ", v).strip()
+
+
+def _norm_street(street: str | None) -> str:
+    v = _norm_token(street)
+    if not v:
+        return ""
+    parts = v.split(" ")
+    if parts[-1] in _STREET_SUFFIX:
+        parts[-1] = _STREET_SUFFIX[parts[-1]]
+    return " ".join(parts)
+
+
+class AddressCreateRequest(BaseModel):
+    postcode: str = Field(min_length=5, max_length=10, examples=["HG1 2BP"])
+    house_number: str | None = Field(default=None, max_length=100, examples=["15"])
+    house_name: str | None = Field(default=None, max_length=200)
+    flat: str | None = Field(default=None, max_length=50)
+    street: str | None = Field(default=None, max_length=200, examples=["Fewston Crescent"])
+    city: str | None = Field(default=None, max_length=100, examples=["Harrogate"])
+    county: str | None = Field(default=None, max_length=100)
+
+
+class AddressCreateResponse(BaseModel):
+    created: bool = Field(description="True if a new address was inserted; False if it already existed")
+    id: int = Field(description="Database id of the created or matched address")
+    detail: str
+
+
+@router.post(
+    "",
+    response_model=AddressCreateResponse,
+    status_code=201,
+    summary="Add an address directly (API, authenticated)",
+    description=(
+        "Insert an address straight into the master database — intended for "
+        "authenticated integrations (EPOS/partners) that add an address when a "
+        "lookup returns nothing. Requires a valid API key.\n\n"
+        "Guardrails: the postcode must be a valid UK format **and** exist in the "
+        "dataset; at least a street or house number/name is required; and the "
+        "request is **de-duplicated** — if a matching address already exists at "
+        "that postcode the existing one is returned (HTTP 200) instead of "
+        "creating a duplicate. New rows are tagged `source=api` and attributed "
+        "to the calling API key."
+    ),
+    responses={
+        201: {"description": "New address created"},
+        200: {"description": "A matching address already existed; returned as-is"},
+        401: {"description": "API key missing"},
+        403: {"description": "API key invalid or deactivated"},
+        404: {"model": ErrorResponse, "description": "Postcode not found in the dataset"},
+        422: {"model": ErrorResponse, "description": "Invalid postcode or no address detail provided"},
+    },
+)
+async def create_address(
+    body: AddressCreateRequest,
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+) -> AddressCreateResponse:
+    normalised = normalise_postcode(body.postcode)
+    if normalised is None:
+        raise HTTPException(
+            status_code=422, detail=f"'{body.postcode}' is not a valid UK postcode format"
+        )
+
+    if not (body.house_number or body.house_name or body.street):
+        raise HTTPException(
+            status_code=422,
+            detail="Provide at least a street name or a house number/name.",
+        )
+
+    no_space = postcode_no_space(normalised)
+    postcode_row = await db.scalar(
+        select(Postcode).where(Postcode.postcode_no_space == no_space)
+    )
+    if postcode_row is None:
+        raise HTTPException(status_code=404, detail=f"Postcode '{normalised}' not found")
+
+    # ── De-dup: compare against existing non-duplicate addresses at this postcode ──
+    want = (
+        _norm_token(body.house_number),
+        _norm_token(body.house_name),
+        _norm_token(body.flat),
+        _norm_street(body.street),
+    )
+    existing_rows = (
+        await db.execute(
+            select(Address)
+            .where(Address.postcode_norm == normalised)
+            .where(Address.duplicate_of.is_(None))
+        )
+    ).scalars().all()
+    for row in existing_rows:
+        have = (
+            _norm_token(row.house_number),
+            _norm_token(row.house_name),
+            _norm_token(row.flat),
+            _norm_street(row.street),
+        )
+        if have == want:
+            response.status_code = 200
+            return AddressCreateResponse(
+                created=False, id=row.id, detail="Address already exists"
+            )
+
+    location = None
+    if postcode_row.latitude is not None and postcode_row.longitude is not None:
+        location = func.ST_SetSRID(
+            func.ST_MakePoint(postcode_row.longitude, postcode_row.latitude), 4326
+        )
+
+    def _clean(v: str | None) -> str | None:
+        v = v.strip() if v else None
+        return v or None
+
+    address = Address(
+        postcode_id=postcode_row.id,
+        postcode_raw=body.postcode.strip().upper(),
+        postcode_norm=normalised,
+        house_number=_clean(body.house_number),
+        house_name=_clean(body.house_name),
+        flat=_clean(body.flat),
+        street=_clean(body.street),
+        city=_clean(body.city),
+        county=_clean(body.county),
+        latitude=postcode_row.latitude,
+        longitude=postcode_row.longitude,
+        location=location,
+        source="api",
+        confidence=0.6,
+        is_complete=bool((body.house_number or body.house_name) and body.street),
+        added_by_key_id=getattr(request.state, "api_key_id", None),
+    )
+    address.source_id = None  # api rows are identified by id + added_by_key_id
+    db.add(address)
+    await db.commit()
+    await db.refresh(address)
+
+    return AddressCreateResponse(
+        created=True, id=address.id, detail="Address added to the database"
     )
