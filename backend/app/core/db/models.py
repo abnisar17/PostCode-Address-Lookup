@@ -146,6 +146,11 @@ class Address(Base):
         ForeignKey("addresses.id"), index=False
     )
 
+    # Attribution: which API key added this row (for api_submitted rows).
+    added_by_key_id: Mapped[int | None] = mapped_column(
+        ForeignKey("api_keys.id"), index=False
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

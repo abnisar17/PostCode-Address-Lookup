@@ -328,6 +328,40 @@ GET /api/postcodes/SO230QD?apiKey=YOUR_API_KEY&page=1&page_size=50</code></pre>
     </div>
   </div>
 
+  <!-- 4b. Add address (API) -->
+  <div class="endpoint">
+    <div class="endpoint-header">
+      <span class="method" style="background:linear-gradient(135deg,#f59e0b,#d97706)">POST</span>
+      <span class="endpoint-url">/api/addresses</span>
+      <span class="endpoint-desc">Add a missing address</span>
+    </div>
+    <div class="endpoint-body">
+      <p>Insert an address directly into the master database &mdash; for authenticated integrations (EPOS/partners) that add an address when a lookup finds nothing. Requires an API key. <strong>De-duplicated:</strong> if a matching address already exists at that postcode it is returned (HTTP 200) instead of creating a duplicate. New rows are tagged <code>source=api</code> and attributed to the calling key.</p>
+      <table class="params-table">
+        <thead><tr><th>Field (JSON body)</th><th>Required</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td>postcode</td><td><span class="badge required">required</span></td><td>Valid UK postcode that exists in the dataset</td></tr>
+          <tr><td>house_number</td><td><span class="badge optional">optional*</span></td><td>e.g. "15"</td></tr>
+          <tr><td>house_name</td><td><span class="badge optional">optional*</span></td><td>e.g. "Rose Cottage"</td></tr>
+          <tr><td>street</td><td><span class="badge optional">optional*</span></td><td>e.g. "Fewston Crescent"</td></tr>
+          <tr><td>flat, city, county</td><td><span class="badge optional">optional</span></td><td>Additional detail</td></tr>
+        </tbody>
+      </table>
+      <p style="font-size:0.8rem;color:#64748b">* At least one of house_number, house_name, or street is required.</p>
+      <h3>Example</h3>
+      <pre><code>curl -X POST <span class="code-string">"https://getaddress.etakeawaymax.co.uk/api/addresses"</span> \\
+  -H <span class="code-string">"X-API-Key: YOUR_API_KEY"</span> \\
+  -H <span class="code-string">"Content-Type: application/json"</span> \\
+  -d <span class="code-string">'{"postcode":"HG1 2BP","house_number":"15","street":"Fewston Crescent","city":"Harrogate"}'</span></code></pre>
+      <h3>Response</h3>
+      <pre><code><span class="code-comment">// 201 Created</span>
+{ <span class="code-key">"created"</span>: true, <span class="code-key">"id"</span>: 31200456, <span class="code-key">"detail"</span>: <span class="code-string">"Address added to the database"</span> }
+
+<span class="code-comment">// 200 OK — a matching address already existed</span>
+{ <span class="code-key">"created"</span>: false, <span class="code-key">"id"</span>: 45268912, <span class="code-key">"detail"</span>: <span class="code-string">"Address already exists"</span> }</code></pre>
+    </div>
+  </div>
+
   <!-- 5. Health -->
   <div class="endpoint">
     <div class="endpoint-header">
